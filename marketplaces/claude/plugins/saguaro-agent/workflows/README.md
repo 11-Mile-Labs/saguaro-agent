@@ -6,6 +6,7 @@ These workflow files are the bundled reference library for Saguaro v1.
 
 | Workflow | Use When | Avoid When |
 |---|---|---|
+| `product` | Feature work needing explicit user stories, acceptance criteria, and scope boundaries before technical research | Simple or obvious changes (`engineering-lite`), or tickets where requirements are already fully specified |
 | `engineering-lite` | Simple local enhancements, obvious bug-adjacent changes, no schema or architecture uncertainty | unknown blast radius, data migration, security-sensitive change |
 | `engineering-standard` | Default feature/enhancement workflow | project-wide migration or major architecture decision |
 | `engineering-deep` | migrations, cross-package changes, security-sensitive changes, unclear or high-risk tickets | routine feature work |
