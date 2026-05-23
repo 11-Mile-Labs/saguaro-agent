@@ -4,6 +4,11 @@ import { dirname, resolve } from "node:path";
 import type { LoadedSaguaroConfig } from "../config.js";
 import { renderRunQueueMarkdown } from "./queue.js";
 import {
+  findIncompleteRun,
+  registerTicketRunIndex,
+  syncTicketIndexFromRun,
+} from "./run-index.js";
+import {
   buildWorkflowLayers,
   getWorkflowPhase,
   getUpstreamPhaseIds,
@@ -59,17 +64,18 @@ export interface LoadedWorkflowRun {
   workflow: WorkflowDefinition;
 }
 
-export function createRunId(
-  workflowName: string,
-  workflowArgs: Record<string, unknown>
-): string {
-  const ticketSlug = workflowArgs.ticket_slug ?? workflowArgs.ticket;
-  if (typeof ticketSlug === "string" && ticketSlug.trim().length > 0) {
-    return ticketSlug.trim();
-  }
+export type WorkflowResumeMode = "auto" | boolean;
 
+export function createOpaqueRunId(workflowName: string): string {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   return `${workflowName}-${stamp}-${randomUUID().slice(0, 6)}`;
+}
+
+export function createRunId(
+  workflowName: string,
+  _workflowArgs: Record<string, unknown> = {}
+): string {
+  return createOpaqueRunId(workflowName);
 }
 
 export function getRunDir(config: LoadedSaguaroConfig, runId: string): string {
@@ -136,6 +142,62 @@ export function createWorkflowRun(
   return writeRunFiles(loadedConfig, workflow, status);
 }
 
+export function startOrResumeWorkflowRun(
+  loadedConfig: LoadedSaguaroConfig,
+  workflow: WorkflowDefinition,
+  workflowArgs: Record<string, unknown> = {},
+  options: { resume?: WorkflowResumeMode; runId?: string } = {}
+): { run: LoadedWorkflowRun; resumed: boolean } {
+  const resume = options.resume ?? "auto";
+  const explicitRunId =
+    options.runId ??
+    (typeof workflowArgs.run_id === "string" && workflowArgs.run_id.trim().length > 0
+      ? workflowArgs.run_id.trim()
+      : undefined);
+
+  if (explicitRunId) {
+    try {
+      const existing = loadWorkflowRun(loadedConfig, explicitRunId);
+      if (existing.status.workflow_name !== workflow.name) {
+        throw new Error(
+          `Run "${explicitRunId}" is for workflow "${existing.status.workflow_name}", not "${workflow.name}".`
+        );
+      }
+      return { run: existing, resumed: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("does not exist")) {
+        throw error;
+      }
+    }
+
+    const run = createWorkflowRun(loadedConfig, workflow, workflowArgs, explicitRunId);
+    registerTicketRunIndex(loadedConfig, run);
+    return { run, resumed: false };
+  }
+
+  const ticketSlug = workflowArgs.ticket_slug ?? workflowArgs.ticket;
+  const normalizedTicketSlug =
+    typeof ticketSlug === "string" && ticketSlug.trim().length > 0 ? ticketSlug.trim() : null;
+
+  if (normalizedTicketSlug && resume !== false) {
+    const incomplete = findIncompleteRun(loadedConfig, workflow.name, normalizedTicketSlug);
+    if (incomplete) {
+      return { run: incomplete, resumed: true };
+    }
+
+    if (resume === true) {
+      throw new Error(
+        `No incomplete run for ticket "${normalizedTicketSlug}" and workflow "${workflow.name}".`
+      );
+    }
+  }
+
+  const run = createWorkflowRun(loadedConfig, workflow, workflowArgs);
+  registerTicketRunIndex(loadedConfig, run);
+  return { run, resumed: false };
+}
+
 export function loadWorkflowRun(
   loadedConfig: LoadedSaguaroConfig,
   runId: string
@@ -158,7 +220,9 @@ export function saveWorkflowRun(
   loadedConfig: LoadedSaguaroConfig,
   run: LoadedWorkflowRun
 ): LoadedWorkflowRun {
-  return writeRunFiles(loadedConfig, run.workflow, run.status);
+  const saved = writeRunFiles(loadedConfig, run.workflow, run.status);
+  syncTicketIndexFromRun(loadedConfig, saved);
+  return saved;
 }
 
 export function artifactPathForPhase(runDir: string, phaseId: string, extension = "md"): string {

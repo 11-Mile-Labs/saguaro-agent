@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -76,7 +76,8 @@ describe("WorkflowService", () => {
       name: "engineering",
       args: { ticket_slug: "workflow-service-test" },
     });
-    expect(started.run_id).toBe("workflow-service-test");
+    expect(started.run_id).not.toBe("workflow-service-test");
+    expect(started.resumed).toBe(false);
 
     const firstDispatch = await service.workflowDispatchPhase({
       run_id: started.run_id,
@@ -129,6 +130,49 @@ describe("WorkflowService", () => {
     expect(info.llm_ok).toBe(true);
   });
 
+  test("auto-resumes incomplete runs by ticket_slug through workflow_start", async () => {
+    const projectRoot = setupProject();
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+      env: {
+        ...process.env,
+        CODEX_HOME: "/tmp/codex-home",
+        EMBEDDINGS_API_KEY: "test-embeddings",
+        LLM_API_KEY: "test-llm",
+      },
+    });
+
+    const first = await service.workflowStart({
+      name: "engineering",
+      args: { ticket_slug: "resume-service-test" },
+    });
+
+    await service.workflowRecordArtifact({
+      run_id: first.run_id,
+      phase_id: "intake",
+      artifact: {
+        content: "# Intake",
+        outputs: { summary: "keep me" },
+      },
+    });
+
+    const resumed = await service.workflowStart({
+      name: "engineering",
+      args: { ticket_slug: "resume-service-test" },
+    });
+
+    expect(resumed.resumed).toBe(true);
+    expect(resumed.run_id).toBe(first.run_id);
+
+    const found = await service.workflowFindRun({
+      ticket_slug: "resume-service-test",
+      workflow_name: "engineering",
+    });
+    expect(found.run?.run_id).toBe(first.run_id);
+    expect(found.run?.completed_phases).toEqual(["intake"]);
+  });
+
   test("lists bundled product workflow and dispatches through product-spec", async () => {
     const projectRoot = setupProject();
     const service = new WorkflowService({
@@ -153,7 +197,7 @@ describe("WorkflowService", () => {
         ticket_description: "Add onboarding checklist for new projects.",
       },
     });
-    expect(started.run_id).toBe("product-workflow-smoke");
+    expect(started.run_id).not.toBe("product-workflow-smoke");
 
     const intakeDispatch = await service.workflowDispatchPhase({
       run_id: started.run_id,
