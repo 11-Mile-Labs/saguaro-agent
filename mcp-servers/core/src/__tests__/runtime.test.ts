@@ -185,7 +185,7 @@ describe("workflow runtime", () => {
 
     saveWorkflowRun(config, run);
     const loaded = loadWorkflowRun(config, run.status.run_id);
-    expect(loaded.status.run_id).toBe("log-test");
+    expect(loaded.status.run_id).toBe(run.status.run_id);
   });
 
   test("loads the config shape written by saguaro init", () => {

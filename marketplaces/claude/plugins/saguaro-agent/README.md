@@ -102,7 +102,9 @@ Memory and knowledge use project-local vector manifests for semantic retrieval. 
 | Tool | Description |
 | --- | --- |
 | `workflow_list` | List bundled and project-local workflows available to run. |
-| `workflow_start` | Start a workflow run and create run state under `.saguaro/runs/`. |
+| `workflow_start` | Start or resume a workflow run; with `ticket_slug` and default `resume: auto`, returns an existing incomplete run instead of resetting state. |
+| `workflow_find_run` | Find a run indexed by `ticket_slug` and `workflow_name`. |
+| `workflow_resume` | Resume an incomplete run for a ticket or error if none exists. |
 | `workflow_status` | Report current workflow progress, gates, and validation state. |
 | `workflow_dispatch_phase` | Dispatch the next eligible phase or a specific phase. |
 | `workflow_validate_dispatch` | Validate the dispatch envelope before a phase runs. |

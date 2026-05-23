@@ -70,7 +70,7 @@ Use the bundled `workflow` skill when the user asks to run work through Saguaro:
 /workflow run engineering --ticket my-ticket
 ```
 
-During a workflow run, `workflow_start` creates `.saguaro/runs/<run-id>/`, `workflow_dispatch_phase` returns envelopes, the host harness executes them, `workflow_validate_output` checks outputs and required Saguaro calls, `workflow_record_artifact` stores artifacts, and `workflow_complete` finalizes the run.
+During a workflow run, `workflow_start` creates or resumes `.saguaro/runs/<run-id>/` (opaque id; ticket lookup uses `.saguaro/runs/_by-ticket/`). Re-invoking with the same `ticket_slug` and workflow returns an incomplete run instead of wiping state. `workflow_dispatch_phase` returns envelopes, the host harness executes them, `workflow_validate_output` checks outputs and required Saguaro calls, `workflow_record_artifact` stores artifacts, and `workflow_complete` finalizes the run.
 
 If validation says a phase skipped required memory or knowledge, query the missing surface and re-dispatch the phase with the validation feedback.
 

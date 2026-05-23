@@ -10315,7 +10315,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve6.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a3 = root.localRefs) === null || _a3 === void 0 ? void 0 : _a3[ref];
         const { schemaId } = this.opts;
@@ -10342,7 +10342,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve6(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -10973,7 +10973,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve6(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -11231,7 +11231,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve6,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -30346,20 +30346,20 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve6();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve6);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
 };
 
 // src/server.ts
-import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
-import { resolve as resolve5 } from "node:path";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { resolve as resolve6 } from "node:path";
 
 // ../core/src/config.ts
 import { existsSync, readFileSync } from "node:fs";
@@ -31032,41 +31032,160 @@ function renderRunQueueMarkdown(status, workflow) {
 `;
 }
 
-// ../core/src/workflow/runtime.ts
-import { mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync, existsSync as existsSync4 } from "node:fs";
-import { randomUUID } from "node:crypto";
-import { dirname as dirname2, resolve as resolve4 } from "node:path";
-function createRunId(workflowName, workflowArgs) {
-  const ticketSlug = workflowArgs.ticket_slug ?? workflowArgs.ticket;
-  if (typeof ticketSlug === "string" && ticketSlug.trim().length > 0) {
-    return ticketSlug.trim();
+// ../core/src/workflow/run-index.ts
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync } from "node:fs";
+import { resolve as resolve4 } from "node:path";
+function extractTicketSlug(workflowArgs) {
+  const raw = workflowArgs.ticket_slug ?? workflowArgs.ticket;
+  if (typeof raw !== "string") {
+    return null;
   }
-  const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  return `${workflowName}-${stamp}-${randomUUID().slice(0, 6)}`;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+function sanitizeTicketSlugForFilename(ticketSlug) {
+  return ticketSlug.replace(/[^A-Za-z0-9._-]+/g, "_");
+}
+function ticketIndexFileName(workflowName, ticketSlug) {
+  return `${workflowName}__${sanitizeTicketSlugForFilename(ticketSlug)}.json`;
+}
+function getTicketIndexDir(config2) {
+  return resolve4(config2.projectRoot, config2.config.runs_dir, "_by-ticket");
+}
+function getTicketIndexPath(config2, workflowName, ticketSlug) {
+  return resolve4(getTicketIndexDir(config2), ticketIndexFileName(workflowName, ticketSlug));
 }
 function getRunDir(config2, runId) {
   return resolve4(config2.projectRoot, config2.config.runs_dir, runId);
 }
-function ensureParentDir(filePath) {
-  mkdirSync2(dirname2(filePath), { recursive: true });
-}
-function writeJson(filePath, value) {
-  ensureParentDir(filePath);
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}
-`, "utf8");
-}
-function writeRunFiles(loadedConfig, workflow, status) {
-  const runDir = getRunDir(loadedConfig, status.run_id);
+function loadWorkflowRunFromIndex(config2, runId) {
+  const runDir = getRunDir(config2, runId);
   const statusPath = resolve4(runDir, "_status.json");
   const queuePath = resolve4(runDir, "_queue.md");
   const workflowPath = resolve4(runDir, "_workflow.json");
-  const dispatchPath = resolve4(runDir, "_dispatch.jsonl");
-  mkdirSync2(runDir, { recursive: true });
+  if (!existsSync4(statusPath) || !existsSync4(workflowPath)) {
+    throw new Error(`Run "${runId}" does not exist under ${runDir}.`);
+  }
+  const status = JSON.parse(readFileSync4(statusPath, "utf8"));
+  const workflow = JSON.parse(readFileSync4(workflowPath, "utf8"));
+  return { runDir, statusPath, queuePath, workflowPath, status, workflow };
+}
+function readTicketIndexEntry(config2, workflowName, ticketSlug) {
+  const indexPath = getTicketIndexPath(config2, workflowName, ticketSlug);
+  if (!existsSync4(indexPath)) {
+    return null;
+  }
+  return JSON.parse(readFileSync4(indexPath, "utf8"));
+}
+function writeTicketIndexEntry(config2, entry) {
+  const indexDir = getTicketIndexDir(config2);
+  mkdirSync2(indexDir, { recursive: true });
+  const indexPath = getTicketIndexPath(config2, entry.workflow_name, entry.ticket_slug);
+  writeFileSync(indexPath, `${JSON.stringify(entry, null, 2)}
+`, "utf8");
+}
+function markTicketIndexCompleted(config2, workflowName, ticketSlug, completedAt) {
+  const existing = readTicketIndexEntry(config2, workflowName, ticketSlug);
+  if (!existing) {
+    return;
+  }
+  writeTicketIndexEntry(config2, {
+    ...existing,
+    completed_at: completedAt
+  });
+}
+function findIndexedRun(config2, workflowName, ticketSlug, options = {}) {
+  const entry = readTicketIndexEntry(config2, workflowName, ticketSlug);
+  if (!entry) {
+    return null;
+  }
+  if (entry.workflow_name !== workflowName) {
+    throw new Error(
+      `Ticket index mismatch for "${ticketSlug}": indexed workflow is "${entry.workflow_name}", requested "${workflowName}".`
+    );
+  }
+  const run = loadWorkflowRunFromIndex(config2, entry.run_id);
+  if (run.status.workflow_name !== workflowName) {
+    throw new Error(
+      `Run "${entry.run_id}" is workflow "${run.status.workflow_name}", expected "${workflowName}".`
+    );
+  }
+  const completedAt = run.status.completed_at ?? entry.completed_at;
+  if (completedAt && !options.includeCompleted) {
+    return null;
+  }
+  return { entry, run };
+}
+function findIncompleteRun(config2, workflowName, ticketSlug) {
+  const indexed = findIndexedRun(config2, workflowName, ticketSlug);
+  if (!indexed) {
+    return null;
+  }
+  if (indexed.run.status.completed_at) {
+    return null;
+  }
+  return indexed.run;
+}
+function registerTicketRunIndex(config2, run) {
+  const ticketSlug = extractTicketSlug(run.status.workflow_args);
+  if (!ticketSlug) {
+    return;
+  }
+  writeTicketIndexEntry(config2, {
+    run_id: run.status.run_id,
+    workflow_name: run.status.workflow_name,
+    ticket_slug: ticketSlug,
+    started_at: run.status.started_at,
+    completed_at: run.status.completed_at
+  });
+}
+function syncTicketIndexFromRun(config2, run) {
+  const ticketSlug = extractTicketSlug(run.status.workflow_args);
+  if (!ticketSlug || !run.status.completed_at) {
+    return;
+  }
+  markTicketIndexCompleted(
+    config2,
+    run.status.workflow_name,
+    ticketSlug,
+    run.status.completed_at
+  );
+}
+
+// ../core/src/workflow/runtime.ts
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync2, existsSync as existsSync5 } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { dirname as dirname2, resolve as resolve5 } from "node:path";
+function createOpaqueRunId(workflowName) {
+  const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return `${workflowName}-${stamp}-${randomUUID().slice(0, 6)}`;
+}
+function createRunId(workflowName, _workflowArgs = {}) {
+  return createOpaqueRunId(workflowName);
+}
+function getRunDir2(config2, runId) {
+  return resolve5(config2.projectRoot, config2.config.runs_dir, runId);
+}
+function ensureParentDir(filePath) {
+  mkdirSync3(dirname2(filePath), { recursive: true });
+}
+function writeJson(filePath, value) {
+  ensureParentDir(filePath);
+  writeFileSync2(filePath, `${JSON.stringify(value, null, 2)}
+`, "utf8");
+}
+function writeRunFiles(loadedConfig, workflow, status) {
+  const runDir = getRunDir2(loadedConfig, status.run_id);
+  const statusPath = resolve5(runDir, "_status.json");
+  const queuePath = resolve5(runDir, "_queue.md");
+  const workflowPath = resolve5(runDir, "_workflow.json");
+  const dispatchPath = resolve5(runDir, "_dispatch.jsonl");
+  mkdirSync3(runDir, { recursive: true });
   writeJson(statusPath, status);
-  writeFileSync(queuePath, renderRunQueueMarkdown(status, workflow), "utf8");
+  writeFileSync2(queuePath, renderRunQueueMarkdown(status, workflow), "utf8");
   writeJson(workflowPath, workflow);
-  if (!existsSync4(dispatchPath)) {
-    writeFileSync(dispatchPath, "", "utf8");
+  if (!existsSync5(dispatchPath)) {
+    writeFileSync2(dispatchPath, "", "utf8");
   }
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
 }
@@ -31092,23 +31211,64 @@ function createWorkflowRun(loadedConfig, workflow, workflowArgs = {}, runId = cr
   };
   return writeRunFiles(loadedConfig, workflow, status);
 }
+function startOrResumeWorkflowRun(loadedConfig, workflow, workflowArgs = {}, options = {}) {
+  const resume = options.resume ?? "auto";
+  const explicitRunId = options.runId ?? (typeof workflowArgs.run_id === "string" && workflowArgs.run_id.trim().length > 0 ? workflowArgs.run_id.trim() : void 0);
+  if (explicitRunId) {
+    try {
+      const existing = loadWorkflowRun(loadedConfig, explicitRunId);
+      if (existing.status.workflow_name !== workflow.name) {
+        throw new Error(
+          `Run "${explicitRunId}" is for workflow "${existing.status.workflow_name}", not "${workflow.name}".`
+        );
+      }
+      return { run: existing, resumed: true };
+    } catch (error51) {
+      const message = error51 instanceof Error ? error51.message : String(error51);
+      if (!message.includes("does not exist")) {
+        throw error51;
+      }
+    }
+    const run2 = createWorkflowRun(loadedConfig, workflow, workflowArgs, explicitRunId);
+    registerTicketRunIndex(loadedConfig, run2);
+    return { run: run2, resumed: false };
+  }
+  const ticketSlug = workflowArgs.ticket_slug ?? workflowArgs.ticket;
+  const normalizedTicketSlug = typeof ticketSlug === "string" && ticketSlug.trim().length > 0 ? ticketSlug.trim() : null;
+  if (normalizedTicketSlug && resume !== false) {
+    const incomplete = findIncompleteRun(loadedConfig, workflow.name, normalizedTicketSlug);
+    if (incomplete) {
+      return { run: incomplete, resumed: true };
+    }
+    if (resume === true) {
+      throw new Error(
+        `No incomplete run for ticket "${normalizedTicketSlug}" and workflow "${workflow.name}".`
+      );
+    }
+  }
+  const run = createWorkflowRun(loadedConfig, workflow, workflowArgs);
+  registerTicketRunIndex(loadedConfig, run);
+  return { run, resumed: false };
+}
 function loadWorkflowRun(loadedConfig, runId) {
-  const runDir = getRunDir(loadedConfig, runId);
-  const statusPath = resolve4(runDir, "_status.json");
-  const queuePath = resolve4(runDir, "_queue.md");
-  const workflowPath = resolve4(runDir, "_workflow.json");
-  if (!existsSync4(statusPath) || !existsSync4(workflowPath)) {
+  const runDir = getRunDir2(loadedConfig, runId);
+  const statusPath = resolve5(runDir, "_status.json");
+  const queuePath = resolve5(runDir, "_queue.md");
+  const workflowPath = resolve5(runDir, "_workflow.json");
+  if (!existsSync5(statusPath) || !existsSync5(workflowPath)) {
     throw new Error(`Run "${runId}" does not exist under ${runDir}.`);
   }
-  const status = JSON.parse(readFileSync4(statusPath, "utf8"));
-  const workflow = JSON.parse(readFileSync4(workflowPath, "utf8"));
+  const status = JSON.parse(readFileSync5(statusPath, "utf8"));
+  const workflow = JSON.parse(readFileSync5(workflowPath, "utf8"));
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
 }
 function saveWorkflowRun(loadedConfig, run) {
-  return writeRunFiles(loadedConfig, run.workflow, run.status);
+  const saved = writeRunFiles(loadedConfig, run.workflow, run.status);
+  syncTicketIndexFromRun(loadedConfig, saved);
+  return saved;
 }
 function artifactPathForPhase(runDir, phaseId, extension = "md") {
-  return resolve4(runDir, `${phaseId}.${extension}`);
+  return resolve5(runDir, `${phaseId}.${extension}`);
 }
 function updateValidationFailure(status, phaseId, errors) {
   const remaining = status.validation_failures.filter((failure) => failure.phase_id !== phaseId);
@@ -37121,7 +37281,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error51) {
@@ -37138,7 +37298,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error51) => {
         reject(error51);
       };
@@ -37216,7 +37376,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve6(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error51) {
           reject(error51);
@@ -37477,12 +37637,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve6, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38582,7 +38742,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -39158,7 +39318,7 @@ var WorkflowService = class {
   constructor(options = {}) {
     this.projectRoot = options.projectRoot;
     this.env = options.env ?? process.env;
-    this.bundledWorkflowsDir = options.bundledWorkflowsDir ?? this.env.SAGUARO_BUNDLED_WORKFLOWS_DIR ?? resolve5(new URL("../../..", import.meta.url).pathname, "workflows");
+    this.bundledWorkflowsDir = options.bundledWorkflowsDir ?? this.env.SAGUARO_BUNDLED_WORKFLOWS_DIR ?? resolve6(new URL("../../..", import.meta.url).pathname, "workflows");
   }
   getLoadedConfig(projectPath) {
     return loadSaguaroConfig(projectPath ?? this.projectRoot);
@@ -39169,7 +39329,7 @@ var WorkflowService = class {
   getWorkflowCatalog(loadedConfig) {
     return discoverWorkflows({
       projectRoot: loadedConfig.projectRoot,
-      projectWorkflowsDir: resolve5(loadedConfig.projectRoot, loadedConfig.config.workflows_dir),
+      projectWorkflowsDir: resolve6(loadedConfig.projectRoot, loadedConfig.config.workflows_dir),
       bundledWorkflowsDir: this.bundledWorkflowsDir,
       engineVersion: "1.0.0"
     });
@@ -39179,7 +39339,7 @@ var WorkflowService = class {
       return;
     }
     appendDispatchLogEntry({
-      runDir: getRunDir(args.loadedConfig, args.runId),
+      runDir: getRunDir2(args.loadedConfig, args.runId),
       runId: args.runId,
       phaseId: args.phaseId ?? null,
       server: "saguaro-workflow",
@@ -39205,12 +39365,47 @@ var WorkflowService = class {
     const loadedConfig = this.getLoadedConfig(args.project_path);
     const catalog = this.getWorkflowCatalog(loadedConfig);
     const workflow = getWorkflowByName(catalog.workflows, args.name).workflow;
-    const run = createWorkflowRun(loadedConfig, workflow, args.args ?? {});
+    const { run, resumed } = startOrResumeWorkflowRun(loadedConfig, workflow, args.args ?? {}, {
+      resume: args.resume,
+      runId: args.run_id
+    });
     return {
       run_id: run.status.run_id,
       status_url: run.runDir,
-      workflow_name: run.status.workflow_name
+      workflow_name: run.status.workflow_name,
+      resumed
     };
+  }
+  async workflowFindRun(args) {
+    const loadedConfig = this.getLoadedConfig(args.project_path);
+    const workflowName = args.workflow_name;
+    if (!workflowName) {
+      throw new Error("workflow_name is required for workflow_find_run.");
+    }
+    const indexed = findIndexedRun(loadedConfig, workflowName, args.ticket_slug, {
+      includeCompleted: args.include_completed ?? false
+    });
+    if (!indexed) {
+      return { run: null };
+    }
+    return {
+      run: {
+        run_id: indexed.run.status.run_id,
+        workflow_name: indexed.run.status.workflow_name,
+        completed_at: indexed.run.status.completed_at,
+        completed_phases: indexed.run.status.completed_phases,
+        pending_phases: indexed.run.status.pending_phases,
+        approval_gates_pending: indexed.run.status.approval_gates_pending
+      }
+    };
+  }
+  async workflowResume(args) {
+    return this.workflowStart({
+      name: args.workflow_name,
+      resume: true,
+      args: { ticket_slug: args.ticket_slug },
+      project_path: args.project_path
+    });
   }
   async workflowStatus(args) {
     const loadedConfig = this.getLoadedConfig(args.project_path);
@@ -39350,9 +39545,9 @@ var WorkflowService = class {
     } : args.artifact;
     const format = payload.format ?? (payload.content ? "md" : "json");
     const path = artifactPathForPhase(run.runDir, args.phase_id, format);
-    mkdirSync3(resolve5(path, ".."), { recursive: true });
+    mkdirSync4(resolve6(path, ".."), { recursive: true });
     if (format === "json") {
-      writeFileSync2(
+      writeFileSync3(
         path,
         `${JSON.stringify(
           {
@@ -39367,7 +39562,7 @@ var WorkflowService = class {
         "utf8"
       );
     } else {
-      writeFileSync2(path, payload.content ?? "", "utf8");
+      writeFileSync3(path, payload.content ?? "", "utf8");
     }
     recordPhaseArtifact(run.workflow, run.status, {
       phaseId: args.phase_id,
@@ -39425,7 +39620,7 @@ var WorkflowService = class {
     }
     run.status.completed_at ??= (/* @__PURE__ */ new Date()).toISOString();
     const artifactIndex = Object.values(run.status.artifacts);
-    writeFileSync2(resolve5(run.runDir, "_artifacts.json"), `${JSON.stringify(artifactIndex, null, 2)}
+    writeFileSync3(resolve6(run.runDir, "_artifacts.json"), `${JSON.stringify(artifactIndex, null, 2)}
 `, "utf8");
     saveWorkflowRun(loadedConfig, run);
     return {
@@ -39447,7 +39642,7 @@ var WorkflowService = class {
   }
   async workflowValidateYaml(args) {
     const loadedConfig = this.getLoadedConfig(args.project_path);
-    const targetPath = resolve5(loadedConfig.projectRoot, args.path);
+    const targetPath = resolve6(loadedConfig.projectRoot, args.path);
     const result = validateWorkflowYamlFile(targetPath, "1.0.0");
     return {
       valid: result.valid,
@@ -39510,13 +39705,36 @@ function createServer(options = {}) {
   );
   server.tool(
     "workflow_start",
-    "Start a workflow run and materialize run state under .saguaro/runs/<run-id>.",
+    "Start or resume a workflow run. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
     {
       name: external_exports.string(),
       args: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+      resume: external_exports.union([external_exports.enum(["auto"]), external_exports.boolean()]).optional(),
+      run_id: external_exports.string().optional(),
       project_path: external_exports.string().optional()
     },
     async (args) => runLoggedTool(service, "workflow_start", args, () => service.workflowStart(args))
+  );
+  server.tool(
+    "workflow_find_run",
+    "Find a workflow run indexed by ticket_slug and workflow_name. Returns null when no matching run exists.",
+    {
+      ticket_slug: external_exports.string(),
+      workflow_name: external_exports.string(),
+      include_completed: external_exports.boolean().optional(),
+      project_path: external_exports.string().optional()
+    },
+    async (args) => runLoggedTool(service, "workflow_find_run", args, () => service.workflowFindRun(args))
+  );
+  server.tool(
+    "workflow_resume",
+    "Resume an incomplete workflow run for a ticket_slug and workflow_name. Errors when no incomplete run exists.",
+    {
+      ticket_slug: external_exports.string(),
+      workflow_name: external_exports.string(),
+      project_path: external_exports.string().optional()
+    },
+    async (args) => runLoggedTool(service, "workflow_resume", args, () => service.workflowResume(args))
   );
   server.tool(
     "workflow_status",

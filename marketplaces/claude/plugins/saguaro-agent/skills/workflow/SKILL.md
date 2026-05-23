@@ -13,7 +13,7 @@ Use this skill for `/workflow run <workflow-name>`.
 
 1. Parse the workflow name plus any `--ticket` or repeated `--arg key=value` pairs from the user request.
 2. Call `workflow_runtime_info()` once so you know the active harness and whether LLM and embeddings are configured.
-3. Call `workflow_start(name, args)` with the parsed workflow name and args object.
+3. Call `workflow_start(name, args)` with the parsed workflow name and args object. Include `ticket_slug` when the host has a stable ticket identifier so Saguaro can auto-resume incomplete runs on re-invocation.
 
 ## Loop
 

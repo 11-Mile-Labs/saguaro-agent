@@ -4,9 +4,9 @@ import {
   appendDispatchLogEntry,
   artifactPathForPhase,
   buildWorkflowLayers,
-  createWorkflowRun,
   detectHarness,
   discoverWorkflows,
+  findIndexedRun,
   generateWorkflowEnvelope,
   getEligiblePhases,
   getRunDir,
@@ -21,6 +21,7 @@ import {
   resolveInputValues,
   resolvePhaseDefaults,
   saveWorkflowRun,
+  startOrResumeWorkflowRun,
   syncApprovalGates,
   updateValidationFailure,
   validateEnvelopeAgainstPhase,
@@ -30,6 +31,7 @@ import {
   type LoadedSaguaroConfig,
   type WorkflowArtifactRecord,
   type WorkflowDispatchEnvelope,
+  type WorkflowResumeMode,
   type WorkflowRunStatus,
 } from "@11-mile-labs/saguaro-core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -121,17 +123,68 @@ export class WorkflowService {
   async workflowStart(args: {
     name: string;
     args?: Record<string, unknown>;
+    resume?: WorkflowResumeMode;
+    run_id?: string;
     project_path?: string;
   }) {
     const loadedConfig = this.getLoadedConfig(args.project_path);
     const catalog = this.getWorkflowCatalog(loadedConfig);
     const workflow = getWorkflowByName(catalog.workflows, args.name).workflow;
-    const run = createWorkflowRun(loadedConfig, workflow, args.args ?? {});
+    const { run, resumed } = startOrResumeWorkflowRun(loadedConfig, workflow, args.args ?? {}, {
+      resume: args.resume,
+      runId: args.run_id,
+    });
     return {
       run_id: run.status.run_id,
       status_url: run.runDir,
       workflow_name: run.status.workflow_name,
+      resumed,
     };
+  }
+
+  async workflowFindRun(args: {
+    ticket_slug: string;
+    workflow_name?: string;
+    include_completed?: boolean;
+    project_path?: string;
+  }) {
+    const loadedConfig = this.getLoadedConfig(args.project_path);
+    const workflowName = args.workflow_name;
+    if (!workflowName) {
+      throw new Error("workflow_name is required for workflow_find_run.");
+    }
+
+    const indexed = findIndexedRun(loadedConfig, workflowName, args.ticket_slug, {
+      includeCompleted: args.include_completed ?? false,
+    });
+
+    if (!indexed) {
+      return { run: null };
+    }
+
+    return {
+      run: {
+        run_id: indexed.run.status.run_id,
+        workflow_name: indexed.run.status.workflow_name,
+        completed_at: indexed.run.status.completed_at,
+        completed_phases: indexed.run.status.completed_phases,
+        pending_phases: indexed.run.status.pending_phases,
+        approval_gates_pending: indexed.run.status.approval_gates_pending,
+      },
+    };
+  }
+
+  async workflowResume(args: {
+    ticket_slug: string;
+    workflow_name: string;
+    project_path?: string;
+  }) {
+    return this.workflowStart({
+      name: args.workflow_name,
+      resume: true,
+      args: { ticket_slug: args.ticket_slug },
+      project_path: args.project_path,
+    });
   }
 
   async workflowStatus(args: { run_id: string; project_path?: string }) {
@@ -531,13 +584,40 @@ export function createServer(options: WorkflowServiceOptions = {}): McpServer {
 
   server.tool(
     "workflow_start",
-    "Start a workflow run and materialize run state under .saguaro/runs/<run-id>.",
+    "Start or resume a workflow run. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
     {
       name: z.string(),
       args: z.record(z.string(), z.unknown()).optional(),
+      resume: z.union([z.enum(["auto"]), z.boolean()]).optional(),
+      run_id: z.string().optional(),
       project_path: z.string().optional(),
     },
     async (args) => runLoggedTool(service, "workflow_start", args, () => service.workflowStart(args))
+  );
+
+  server.tool(
+    "workflow_find_run",
+    "Find a workflow run indexed by ticket_slug and workflow_name. Returns null when no matching run exists.",
+    {
+      ticket_slug: z.string(),
+      workflow_name: z.string(),
+      include_completed: z.boolean().optional(),
+      project_path: z.string().optional(),
+    },
+    async (args) =>
+      runLoggedTool(service, "workflow_find_run", args, () => service.workflowFindRun(args))
+  );
+
+  server.tool(
+    "workflow_resume",
+    "Resume an incomplete workflow run for a ticket_slug and workflow_name. Errors when no incomplete run exists.",
+    {
+      ticket_slug: z.string(),
+      workflow_name: z.string(),
+      project_path: z.string().optional(),
+    },
+    async (args) =>
+      runLoggedTool(service, "workflow_resume", args, () => service.workflowResume(args))
   );
 
   server.tool(
