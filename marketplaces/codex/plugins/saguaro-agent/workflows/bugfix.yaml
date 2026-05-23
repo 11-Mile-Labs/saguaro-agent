@@ -1,0 +1,72 @@
+name: bugfix
+description: "Bugfix workflow focused on reproduction, root cause, and regression safety."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+approval_gates:
+  - after: da
+    prompt: "Approve the fix plan before implementation?"
+phases:
+  - id: triage
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - bug_summary: required
+        - suspected_scope: required
+  - id: reproduce
+    depends_on: [triage]
+    agent: explore
+    contract:
+      inputs: [bug_summary, suspected_scope]
+      outputs: [repro_steps, failing_signal]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: root-cause
+    depends_on: [reproduce]
+    agent: architect
+    model_tier: deep
+    contract:
+      inputs: [bug_summary, repro_steps, failing_signal]
+      outputs: [root_cause_brief, blast_radius]
+      requires_memory_query: true
+  - id: fix-plan
+    depends_on: [root-cause]
+    agent: impact-analyzer
+    contract:
+      inputs: [root_cause_brief, blast_radius]
+      outputs: [fix_plan, rollback_notes]
+  - id: da
+    depends_on: [fix-plan]
+    agent: devils-advocate
+    contract:
+      inputs: [bug_summary, root_cause_brief, fix_plan, rollback_notes]
+      outputs: [da_doc, approve]
+  - id: implement
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [fix_plan, da_doc]
+      outputs: [implementation_summary, files_changed]
+      requires_memory_query: true
+  - id: verify
+    depends_on: [implement]
+    agent: code-reviewer
+    contract:
+      inputs: [implementation_summary, files_changed, failing_signal]
+      outputs: [verification_summary, regression_notes]
+  - id: docs
+    depends_on: [verify]
+    agent: docs-writer
+    contract:
+      inputs: [implementation_summary, verification_summary]
+      outputs: [docs_summary]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

@@ -1,0 +1,59 @@
+name: release-slice
+description: "Plan and ship a focused documentation release slice."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+approval_gates:
+  - after: da
+    prompt: "Approve the release slice before writing artifacts?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - release_summary: required
+        - release_goal: required
+  - id: research
+    depends_on: [intake]
+    parallel_group: discovery
+    agent: explore
+    contract:
+      inputs: [release_summary]
+      outputs: [source_inventory]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: risk-map
+    depends_on: [intake]
+    parallel_group: discovery
+    agent: impact-analyzer
+    contract:
+      inputs: [release_goal]
+      outputs: [risk_brief]
+      requires_memory_query: true
+  - id: da
+    depends_on: [research, risk-map]
+    agent: devils-advocate
+    contract:
+      inputs: [source_inventory, risk_brief, release_goal]
+      outputs: [da_doc, approve]
+  - id: write
+    depends_on: [da]
+    agent: docs-writer
+    contract:
+      inputs: [source_inventory, da_doc]
+      outputs: [draft_summary]
+  - id: review
+    depends_on: [write]
+    agent: code-reviewer
+    contract:
+      inputs: [draft_summary]
+      outputs: [review_doc]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

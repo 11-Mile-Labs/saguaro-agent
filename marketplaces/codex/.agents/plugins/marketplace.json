@@ -1,0 +1,22 @@
+{
+  "name": "saguaro",
+  "interface": {
+    "displayName": "Saguaro"
+  },
+  "plugins": [
+    {
+      "name": "saguaro-agent",
+      "version": "0.1.0-alpha.2",
+      "description": "Saguaro workflow, memory, and knowledge MCP servers.",
+      "source": {
+        "source": "local",
+        "path": "./plugins/saguaro-agent"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    }
+  ]
+}

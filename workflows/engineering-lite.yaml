@@ -1,0 +1,51 @@
+name: engineering-lite
+description: "Slim engineering workflow for simple local changes with obvious implementation paths."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+approval_gates:
+  - after: da
+    prompt: "Approve the implementation plan before code changes?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - intake_summary: required
+        - scope_class: required
+        - acceptance_criteria: required
+  - id: plan
+    depends_on: [intake]
+    agent: planner
+    contract:
+      inputs: [intake_summary, acceptance_criteria]
+      outputs: [implementation_plan, affected_areas, verification_plan]
+      requires_memory_query: true
+  - id: da
+    depends_on: [plan]
+    agent: devils-advocate
+    contract:
+      inputs: [implementation_plan, affected_areas, verification_plan]
+      outputs: [da_doc, approve]
+  - id: implement
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [implementation_plan, da_doc]
+      outputs: [implementation_summary, files_changed, verification]
+  - id: review
+    depends_on: [implement]
+    agent: code-reviewer
+    contract:
+      inputs: [implementation_summary, files_changed, verification]
+      outputs: [review_doc, review_outcome]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

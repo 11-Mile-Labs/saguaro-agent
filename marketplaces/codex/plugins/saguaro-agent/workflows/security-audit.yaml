@@ -1,0 +1,73 @@
+name: security-audit
+description: "Security audit workflow for reconnaissance, threat modeling, and remediation guidance."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: high
+  memory_scope: [run, project]
+  knowledge_scope: [project, global]
+approval_gates:
+  - after: da
+    prompt: "Approve the remediation plan before implementation?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - audit_scope: required
+        - asset_list: required
+  - id: reconnaissance
+    depends_on: [intake]
+    agent: explore
+    model_tier: deep
+    contract:
+      inputs: [audit_scope, asset_list]
+      outputs: [recon_brief, trust_boundaries]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: dependency-audit
+    depends_on: [reconnaissance]
+    parallel_group: threat-discovery
+    agent: code-reviewer
+    contract:
+      inputs: [recon_brief]
+      outputs: [dependency_findings]
+  - id: abuse-cases
+    depends_on: [reconnaissance]
+    parallel_group: threat-discovery
+    agent: architect
+    contract:
+      inputs: [trust_boundaries, asset_list]
+      outputs: [abuse_case_brief]
+  - id: impact
+    depends_on: [dependency-audit, abuse-cases]
+    agent: impact-analyzer
+    contract:
+      inputs: [dependency_findings, abuse_case_brief]
+      outputs: [impact_doc, severity_matrix]
+  - id: da
+    depends_on: [impact]
+    agent: devils-advocate
+    contract:
+      inputs: [dependency_findings, abuse_case_brief, impact_doc, severity_matrix]
+      outputs: [da_doc, approve]
+  - id: remediation
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [impact_doc, severity_matrix, da_doc]
+      outputs: [remediation_plan, files_changed]
+      requires_memory_query: true
+  - id: report
+    depends_on: [remediation]
+    agent: docs-writer
+    contract:
+      inputs: [remediation_plan, files_changed]
+      outputs: [report_summary]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

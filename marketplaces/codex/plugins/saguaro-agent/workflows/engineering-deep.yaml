@@ -1,0 +1,81 @@
+name: engineering-deep
+description: "Deep engineering workflow for migrations, architecture changes, and high-risk work."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+approval_gates:
+  - after: da
+    prompt: "Approve the implementation plan before code changes?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - intake_summary: required
+        - scope_class: required
+        - research_targets: optional
+  - id: research
+    depends_on: [intake]
+    agent: explore
+    model_tier: deep
+    contract:
+      inputs: [intake_summary, scope_class, research_targets]
+      outputs: [research_doc, research_findings]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: architecture
+    depends_on: [research]
+    agent: architect
+    model_tier: deep
+    effort: high
+    contract:
+      inputs: [intake_summary, research_doc, research_findings]
+      outputs: [architecture_doc, implementation_plan]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: impact
+    depends_on: [architecture]
+    agent: impact-analyzer
+    contract:
+      inputs: [intake_summary, architecture_doc, implementation_plan]
+      outputs: [impact_doc, affected_areas]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: da
+    depends_on: [impact]
+    agent: devils-advocate
+    model_tier: deep
+    contract:
+      inputs: [architecture_doc, implementation_plan, impact_doc, affected_areas]
+      outputs: [da_doc, approve]
+  - id: implement
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [implementation_plan, da_doc]
+      outputs: [implementation_summary, files_changed, verification]
+      requires_memory_query: true
+  - id: review
+    depends_on: [implement]
+    agent: code-reviewer
+    contract:
+      inputs: [implementation_summary, files_changed, verification]
+      outputs: [review_doc, review_outcome]
+  - id: docs
+    depends_on: [review]
+    agent: docs-writer
+    contract:
+      inputs: [intake_summary, research_doc, architecture_doc, impact_doc, da_doc, implementation_summary, verification, review_doc]
+      outputs: [docs_summary, knowledge_captures]
+      requires_memory_query: true
+      requires_knowledge_query: true
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

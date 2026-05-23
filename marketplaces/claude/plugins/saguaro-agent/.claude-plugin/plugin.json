@@ -1,0 +1,70 @@
+{
+  "name": "saguaro-agent",
+  "version": "0.1.0-alpha.2",
+  "description": "Saguaro workflow, memory, and knowledge MCP servers.",
+  "author": {
+    "name": "11 Mile Labs",
+    "url": "https://github.com/11-Mile-Labs"
+  },
+  "homepage": "https://github.com/11-Mile-Labs/saguaro-agent",
+  "repository": "https://github.com/11-Mile-Labs/saguaro-agent",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "workflow",
+    "memory",
+    "knowledge"
+  ],
+  "skills": "./skills",
+  "mcpServers": {
+    "saguaro-workflow": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/saguaro-workflow/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}",
+        "SAGUARO_BUNDLED_WORKFLOWS_DIR": "${CLAUDE_PLUGIN_ROOT}/workflows",
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "LLM_BASE_URL": "${LLM_BASE_URL}",
+        "LLM_MODEL": "${LLM_MODEL}"
+      }
+    },
+    "saguaro-memory": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/saguaro-memory/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}"
+      }
+    },
+    "saguaro-knowledge": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/saguaro-knowledge/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}",
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "LLM_BASE_URL": "${LLM_BASE_URL}",
+        "LLM_MODEL": "${LLM_MODEL}"
+      }
+    }
+  }
+}

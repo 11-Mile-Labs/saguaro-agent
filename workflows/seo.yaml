@@ -1,0 +1,75 @@
+name: seo
+description: "SEO workflow for search research, technical fixes, and content changes."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project, global]
+approval_gates:
+  - after: da
+    prompt: "Approve the SEO plan before implementation?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - seo_summary: required
+        - target_urls: required
+  - id: research
+    depends_on: [intake]
+    agent: explore
+    model_tier: deep
+    contract:
+      inputs: [seo_summary, target_urls]
+      outputs: [search_brief, keyword_map]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: technical-audit
+    depends_on: [research]
+    parallel_group: seo-discovery
+    agent: architect
+    contract:
+      inputs: [search_brief, target_urls]
+      outputs: [technical_findings]
+  - id: content-strategy
+    depends_on: [research]
+    parallel_group: seo-discovery
+    agent: impact-analyzer
+    contract:
+      inputs: [keyword_map, target_urls]
+      outputs: [content_plan]
+      requires_knowledge_query: true
+  - id: da
+    depends_on: [technical-audit, content-strategy]
+    agent: devils-advocate
+    model_tier: deep
+    contract:
+      inputs: [search_brief, technical_findings, content_plan]
+      outputs: [da_doc, approve]
+  - id: implement
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [technical_findings, content_plan, da_doc]
+      outputs: [implementation_summary, files_changed]
+      requires_memory_query: true
+  - id: review
+    depends_on: [implement]
+    agent: code-reviewer
+    contract:
+      inputs: [implementation_summary, files_changed]
+      outputs: [review_doc, review_outcome]
+  - id: report
+    depends_on: [review]
+    agent: docs-writer
+    contract:
+      inputs: [implementation_summary, review_doc, keyword_map]
+      outputs: [report_summary]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

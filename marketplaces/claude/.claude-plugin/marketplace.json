@@ -1,0 +1,17 @@
+{
+  "name": "saguaro",
+  "description": "Saguaro plugin marketplace for Claude Code.",
+  "owner": {
+    "name": "11 Mile Labs",
+    "url": "https://github.com/11-Mile-Labs"
+  },
+  "plugins": [
+    {
+      "name": "saguaro-agent",
+      "version": "0.1.0-alpha.2",
+      "description": "Saguaro workflow, memory, and knowledge MCP servers.",
+      "source": "./plugins/saguaro-agent",
+      "category": "Coding"
+    }
+  ]
+}

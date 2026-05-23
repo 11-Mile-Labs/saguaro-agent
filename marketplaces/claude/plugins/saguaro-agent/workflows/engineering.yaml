@@ -1,0 +1,74 @@
+name: engineering
+description: "Full engineering workflow from intake through docs."
+version: "1.0.0"
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+approval_gates:
+  - after: da
+    prompt: "Approve the architecture and tradeoff review before implementation?"
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs:
+        - ticket_slug: required
+        - ticket_description: required
+      outputs:
+        - intake_summary: required
+        - scope_class: required
+  - id: research
+    depends_on: [intake]
+    agent: explore
+    model_tier: deep
+    contract:
+      inputs: [intake_summary, scope_class]
+      outputs: [research_brief, constraints_brief]
+      requires_memory_query: true
+      requires_knowledge_query: true
+  - id: architecture
+    depends_on: [research]
+    agent: architect
+    effort: high
+    contract:
+      inputs: [intake_summary, research_brief, constraints_brief]
+      outputs: [architecture_doc]
+      requires_memory_query: true
+  - id: impact
+    depends_on: [architecture]
+    agent: impact-analyzer
+    contract:
+      inputs: [architecture_doc]
+      outputs: [impact_doc]
+  - id: da
+    depends_on: [impact]
+    agent: devils-advocate
+    model_tier: deep
+    contract:
+      inputs: [architecture_doc, impact_doc]
+      outputs: [da_doc, approve]
+  - id: implement
+    depends_on: [da]
+    agent: implementer
+    effort: high
+    contract:
+      inputs: [architecture_doc, da_doc]
+      outputs: [implementation_summary, files_changed]
+      requires_memory_query: true
+  - id: review
+    depends_on: [implement]
+    agent: code-reviewer
+    contract:
+      inputs: [implementation_summary, files_changed]
+      outputs: [review_doc, review_outcome]
+  - id: docs
+    depends_on: [review]
+    agent: docs-writer
+    contract:
+      inputs: [implementation_summary, review_doc]
+      outputs: [docs_summary]
+on_workflow_complete:
+  - prompt_memory_promotion
+  - write_artifact_index

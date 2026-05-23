@@ -1,0 +1,21 @@
+{
+  "name": "saguaro-agent",
+  "version": "0.1.0-alpha.2",
+  "description": "Saguaro workflow, memory, and knowledge MCP servers.",
+  "author": {
+    "name": "11 Mile Labs",
+    "url": "https://github.com/11-Mile-Labs"
+  },
+  "homepage": "https://github.com/11-Mile-Labs/saguaro-agent",
+  "repository": "https://github.com/11-Mile-Labs/saguaro-agent",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "workflow",
+    "memory",
+    "knowledge"
+  ],
+  "displayName": "Saguaro",
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,23 @@
+embeddings:
+  # Endpoint and model resolve from EMBEDDINGS_BASE_URL / EMBEDDINGS_MODEL.
+  api_key_env: EMBEDDINGS_API_KEY
+
+llm:
+  # Endpoint and model resolve from LLM_BASE_URL / LLM_MODEL.
+  api_key_env: LLM_API_KEY
+  temperature: 0
+
+redaction:
+  enabled: true
+  disabled_rules: ""
+  additional_allow_patterns: ""
+
+memory:
+  collection: "saguaro_memory"
+
+knowledge:
+  collection: "saguaro_knowledge"
+  chunk_size: 900
+
+workflows_dir: .saguaro/workflows
+runs_dir: .saguaro/runs

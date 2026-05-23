@@ -1,0 +1,7 @@
+{
+  "name": "nextjs-engineering-demo",
+  "private": true,
+  "scripts": {
+    "dev": "next dev"
+  }
+}

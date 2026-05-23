@@ -1,0 +1,27 @@
+node_modules/
+**/.saguaro/runs/
+**/.saguaro/data/
+.env
+.env.*
+!.env.example
+.DS_Store
+.claude/metrics/
+
+# Avoid reintroducing root-level harness install glue.
+/.mcp.json
+/mcp.json
+/.claude-plugin/
+/.codex-plugin/
+/.agents/
+/.agents/plugins/
+/packages/
+
+# Saguaro ships self-contained MCP runtime bundles.
+!mcp-servers/saguaro-*/dist/
+!mcp-servers/saguaro-*/dist/**
+!marketplaces/**/mcp-servers/saguaro-*/dist/
+!marketplaces/**/mcp-servers/saguaro-*/dist/**
+
+# Codegraph
+.codegraph/
+codegraph.mdc

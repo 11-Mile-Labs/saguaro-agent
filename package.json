@@ -1,0 +1,37 @@
+{
+  "name": "saguaro-agent",
+  "version": "0.1.0-alpha.2",
+  "private": false,
+  "description": "Durable workflow, memory, and knowledge foundations for AI coding agents.",
+  "type": "module",
+  "bin": {
+    "saguaro": "./bin/saguaro.mjs"
+  },
+  "scripts": {
+    "build": "pnpm -r build && node scripts/build-marketplaces.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "examples:smoke": "node scripts/run-example-workflows.mjs",
+    "harness:smoke": "node scripts/smoke-harness-manifests.mjs",
+    "plugin:validate": "node scripts/validate-marketplaces.mjs",
+    "migrate:storage": "node scripts/migrate-storage.mjs",
+    "saguaro": "node bin/saguaro.mjs",
+    "smoke:local": "node scripts/smoke-local.mjs",
+    "shims:test": "node scripts/test-shims.mjs",
+    "tiers:test": "node scripts/test-model-tiers.mjs",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint && node scripts/lint-workflow-yaml.mjs && node scripts/lint-thin-loop-skills.mjs",
+    "test": "pnpm -r test && node scripts/test-lint-workflow-yaml.mjs && node scripts/test-lint-thin-loop-skills.mjs && node scripts/test-shims.mjs && node scripts/test-model-tiers.mjs && node scripts/lint-workflow-yaml.mjs && node scripts/lint-thin-loop-skills.mjs"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "volta": {
+    "node": "24.15.0"
+  }
+}

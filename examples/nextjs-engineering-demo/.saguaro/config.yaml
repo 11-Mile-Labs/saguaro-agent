@@ -1,0 +1,21 @@
+embeddings:
+  base_url: "https://api.openai.com/v1"
+  model: "text-embedding-3-small"
+  api_key_env: EMBEDDINGS_API_KEY
+
+llm:
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-5.4"
+  api_key_env: LLM_API_KEY
+
+memory:
+  collection: "nextjs-engineering-demo-memory"
+
+knowledge:
+  collection: "nextjs-engineering-demo-knowledge"
+
+defaults:
+  model_tier: standard
+
+workflows_dir: .saguaro/workflows
+runs_dir: .saguaro/runs

@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "saguaro-workflow": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-workflow/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}",
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "LLM_BASE_URL": "${LLM_BASE_URL}",
+        "LLM_MODEL": "${LLM_MODEL}"
+      }
+    },
+    "saguaro-memory": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-memory/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}"
+      }
+    },
+    "saguaro-knowledge": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-knowledge/dist/index.mjs"
+      ],
+      "env": {
+        "EMBEDDINGS_API_KEY": "${EMBEDDINGS_API_KEY}",
+        "EMBEDDINGS_BASE_URL": "${EMBEDDINGS_BASE_URL}",
+        "EMBEDDINGS_MODEL": "${EMBEDDINGS_MODEL}",
+        "SAGUARO_STORAGE_BACKEND": "${SAGUARO_STORAGE_BACKEND}",
+        "VECTOR_STORE_BASE_URL": "${VECTOR_STORE_BASE_URL}",
+        "VECTOR_STORE_API_KEY": "${VECTOR_STORE_API_KEY}",
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "LLM_BASE_URL": "${LLM_BASE_URL}",
+        "LLM_MODEL": "${LLM_MODEL}"
+      }
+    }
+  }
+}

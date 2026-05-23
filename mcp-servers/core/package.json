@@ -1,0 +1,62 @@
+{
+  "name": "@11-mile-labs/saguaro-core",
+  "version": "0.1.0-alpha.2",
+  "description": "Shared workflow core for Saguaro MCP servers.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./config.js": {
+      "types": "./src/config.ts",
+      "default": "./src/config.ts"
+    },
+    "./workflow/discovery.js": {
+      "types": "./src/workflow/discovery.ts",
+      "default": "./src/workflow/discovery.ts"
+    },
+    "./workflow/dispatch-log.js": {
+      "types": "./src/workflow/dispatch-log.ts",
+      "default": "./src/workflow/dispatch-log.ts"
+    },
+    "./workflow/envelope.js": {
+      "types": "./src/workflow/envelope.ts",
+      "default": "./src/workflow/envelope.ts"
+    },
+    "./workflow/queue.js": {
+      "types": "./src/workflow/queue.ts",
+      "default": "./src/workflow/queue.ts"
+    },
+    "./workflow/runtime.js": {
+      "types": "./src/workflow/runtime.ts",
+      "default": "./src/workflow/runtime.ts"
+    },
+    "./workflow/types.js": {
+      "types": "./src/workflow/types.ts",
+      "default": "./src/workflow/types.ts"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.8"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "saguaro-agent",
+  "version": "0.1.0-alpha.2",
+  "description": "Saguaro provides project-local workflow orchestration, persistent memory, and durable knowledge for AI coding harnesses.",
+  "contextFileName": "GEMINI.md",
+  "skillsDir": "skills",
+  "mcpServers": {
+    "saguaro-workflow": {
+      "command": "node",
+      "args": [
+        "${extensionPath}/mcp-servers/saguaro-workflow/dist/index.mjs"
+      ],
+      "env": {
+        "SAGUARO_BUNDLED_WORKFLOWS_DIR": "${extensionPath}/workflows"
+      }
+    },
+    "saguaro-memory": {
+      "command": "node",
+      "args": [
+        "${extensionPath}/mcp-servers/saguaro-memory/dist/index.mjs"
+      ],
+      "env": {}
+    },
+    "saguaro-knowledge": {
+      "command": "node",
+      "args": [
+        "${extensionPath}/mcp-servers/saguaro-knowledge/dist/index.mjs"
+      ],
+      "env": {}
+    }
+  }
+}
