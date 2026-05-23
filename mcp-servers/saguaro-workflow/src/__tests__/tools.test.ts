@@ -1,8 +1,12 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import { WorkflowService } from "../server.js";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const bundledWorkflowsDir = resolve(repoRoot, "workflows");
 
 function setupProject(): string {
   const root = mkdtempSync(resolve(tmpdir(), "saguaro-workflow-service-"));
@@ -123,5 +127,68 @@ describe("WorkflowService", () => {
     expect(info.harness).toBe("codex");
     expect(info.embeddings_ok).toBe(true);
     expect(info.llm_ok).toBe(true);
+  });
+
+  test("lists bundled product workflow and dispatches through product-spec", async () => {
+    const projectRoot = setupProject();
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir,
+      env: {
+        ...process.env,
+        CODEX_HOME: "/tmp/codex-home",
+        EMBEDDINGS_API_KEY: "test-embeddings",
+        LLM_API_KEY: "test-llm",
+      },
+    });
+
+    const listed = await service.workflowList();
+    const product = listed.workflows.find((workflow) => workflow.name === "product");
+    expect(product).toMatchObject({ name: "product", source: "bundled" });
+
+    const started = await service.workflowStart({
+      name: "product",
+      args: {
+        ticket_slug: "product-workflow-smoke",
+        ticket_description: "Add onboarding checklist for new projects.",
+      },
+    });
+    expect(started.run_id).toBe("product-workflow-smoke");
+
+    const intakeDispatch = await service.workflowDispatchPhase({
+      run_id: started.run_id,
+    });
+    const intakeEnvelopes = (intakeDispatch as { envelopes?: Array<{ phase_id: string }> }).envelopes;
+    expect(intakeEnvelopes?.[0]?.phase_id).toBe("intake");
+
+    await service.workflowRecordArtifact({
+      run_id: started.run_id,
+      phase_id: "intake",
+      artifact: {
+        content: "# Intake",
+        outputs: {
+          intake_summary: "Onboarding checklist feature",
+          scope_class: "feature",
+          research_targets: "examples/, docs/getting-started.md",
+        },
+      },
+    });
+
+    const productSpecDispatch = await service.workflowDispatchPhase({
+      run_id: started.run_id,
+    });
+    const productSpecEnvelopes = (productSpecDispatch as {
+      envelopes?: Array<{ phase_id: string; outputs_required: string[] }>;
+    }).envelopes;
+    expect(productSpecEnvelopes?.[0]?.phase_id).toBe("product-spec");
+    expect(productSpecEnvelopes?.[0]?.outputs_required).toEqual(
+      expect.arrayContaining([
+        "user_stories",
+        "acceptance_criteria",
+        "in_scope",
+        "out_of_scope",
+        "product_spec_summary",
+      ])
+    );
   });
 });

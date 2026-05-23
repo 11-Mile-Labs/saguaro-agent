@@ -30388,7 +30388,6 @@ var StorageCollectionConfigSchema = EndpointConfigSchema.extend({
 });
 var SaguaroConfigSchema = external_exports.object({
   embeddings: EndpointConfigSchema.extend({
-    model: external_exports.string().min(1),
     api_key_env: external_exports.string().min(1)
   }),
   llm: EndpointConfigSchema.extend({
