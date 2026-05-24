@@ -39,11 +39,9 @@ describe("saguaro-knowledge tool behavior", () => {
     installFakeBackends();
     const projectRoot = await mkdtemp(join(tmpdir(), "saguaro-knowledge-"));
 
-    const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createKnowledgeToolset } = await import("../tools.js");
 
-    const runtime = createStorageRuntime({ projectRoot });
-    const tools = byName(createKnowledgeToolset(runtime));
+    const tools = byName(createKnowledgeToolset({ defaultProjectRoot: projectRoot }));
 
     const ingested = await tools.knowledge_ingest.execute({
       title: "Queue Retry Notes",

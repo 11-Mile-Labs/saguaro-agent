@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, isAbsolute, join, resolve } from "node:path";
+import { findProjectRoot } from "../config.js";
 import type { SaguaroConfig, StorageRuntime } from "./types.js";
 
 interface CreateStorageRuntimeOptions {
@@ -107,7 +108,9 @@ function deriveProjectId(projectRoot: string): string | undefined {
 }
 
 export function createStorageRuntime(options: CreateStorageRuntimeOptions = {}): StorageRuntime {
-  const projectRoot = resolve(options.projectRoot ?? process.env.SAGUARO_PROJECT_ROOT ?? process.cwd());
+  const projectRoot = resolve(
+    options.projectRoot ?? process.env.SAGUARO_PROJECT_ROOT ?? findProjectRoot(),
+  );
   const configPath = resolveConfigPath(projectRoot, options.configPath ?? process.env.SAGUARO_CONFIG_PATH);
   const config = loadConfig(configPath);
 
@@ -128,4 +131,16 @@ export function createStorageRuntime(options: CreateStorageRuntimeOptions = {}):
     },
     projectId: deriveProjectId(projectRoot),
   };
+}
+
+/** Resolve project-local storage paths for a tool call (same root semantics as workflow_* project_path). */
+export function resolveStorageRuntimeForToolArgs(
+  args: Record<string, unknown>,
+  options: CreateStorageRuntimeOptions = {},
+): StorageRuntime {
+  const projectPath = typeof args.project_path === "string" ? args.project_path.trim() : undefined;
+  return createStorageRuntime({
+    ...options,
+    projectRoot: projectPath || options.projectRoot,
+  });
 }

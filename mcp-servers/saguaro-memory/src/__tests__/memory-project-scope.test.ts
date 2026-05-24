@@ -21,7 +21,7 @@ describe("saguaro-memory per-call project scoping", () => {
 
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createMemoryToolset } = await import("../tools.js");
-    const tools = byName(createMemoryToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createMemoryToolset({ defaultProjectRoot: projectRoot }));
 
     await tools.memory_store.execute({ content: "Belongs to alpha.", scope: "project", project_id: "alpha" });
     await tools.memory_store.execute({ content: "Belongs to beta.", scope: "project", project_id: "beta" });
@@ -47,7 +47,7 @@ describe("saguaro-memory per-call project scoping", () => {
 
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createMemoryToolset } = await import("../tools.js");
-    const tools = byName(createMemoryToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createMemoryToolset({ defaultProjectRoot: projectRoot }));
 
     await tools.memory_store.execute({ content: "Unscoped memory.", scope: "project" });
     const listed = await tools.memory_list.execute({ scope: "project" });
@@ -63,7 +63,7 @@ describe("saguaro-memory per-call project scoping", () => {
 
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createMemoryToolset } = await import("../tools.js");
-    const tools = byName(createMemoryToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createMemoryToolset({ defaultProjectRoot: projectRoot }));
 
     await expect(
       tools.memory_store.execute({ content: "Evil.", scope: "project", project_id: "../escape" }),
@@ -79,7 +79,7 @@ describe("saguaro-memory per-call project scoping", () => {
 
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createMemoryToolset } = await import("../tools.js");
-    const tools = byName(createMemoryToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createMemoryToolset({ defaultProjectRoot: projectRoot }));
 
     await tools.memory_store.execute({
       content: "A truly global lesson.",

@@ -1,6 +1,6 @@
 {
   "name": "@11-mile-labs/saguaro-workflow",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Saguaro workflow MCP server.",
   "type": "module",
   "main": "dist/index.mjs",

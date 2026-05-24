@@ -9,10 +9,8 @@ function getShape(schema: any): Record<string, unknown> {
 describe("saguaro-memory server surface", () => {
   it("registers exactly the v1 memory tools and no extras", async () => {
     const { createServer } = await import("../server.js");
-    const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
 
-    const runtime = createStorageRuntime({ projectRoot: "/tmp/saguaro-memory-smoke" });
-    const server = createServer(runtime);
+    const server = createServer();
     const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
 
     expect(Object.keys(tools).sort()).toEqual([
@@ -29,10 +27,8 @@ describe("saguaro-memory server surface", () => {
 
   it("includes dispatch context inputs on every tool and 1% guidance on retrieval", async () => {
     const { createServer } = await import("../server.js");
-    const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
 
-    const runtime = createStorageRuntime({ projectRoot: "/tmp/saguaro-memory-schema" });
-    const server = createServer(runtime);
+    const server = createServer();
     const tools = (server as unknown as {
       _registeredTools: Record<string, { description: string; inputSchema: Record<string, unknown> }>;
     })._registeredTools;
@@ -41,6 +37,7 @@ describe("saguaro-memory server surface", () => {
       const shape = getShape(tool.inputSchema);
       expect(Object.keys(shape)).toContain("run_id");
       expect(Object.keys(shape)).toContain("phase_id");
+      expect(Object.keys(shape)).toContain("project_path");
     }
 
     expect(tools.memory_retrieve.description).toMatch(/1% chance/i);

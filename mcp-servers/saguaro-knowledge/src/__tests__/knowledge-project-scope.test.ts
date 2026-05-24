@@ -29,7 +29,7 @@ describe("saguaro-knowledge per-call project scoping", () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "saguaro-kn-scope-"));
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createKnowledgeToolset } = await import("../tools.js");
-    const tools = byName(createKnowledgeToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createKnowledgeToolset({ defaultProjectRoot: projectRoot }));
 
     await tools.knowledge_ingest.execute({ title: "Alpha", content: "Alpha body.", scope: "project", project_id: "alpha" });
     await tools.knowledge_ingest.execute({ title: "Beta", content: "Beta body.", scope: "project", project_id: "beta" });
@@ -46,7 +46,7 @@ describe("saguaro-knowledge per-call project scoping", () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "saguaro-kn-traversal-"));
     const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createKnowledgeToolset } = await import("../tools.js");
-    const tools = byName(createKnowledgeToolset(createStorageRuntime({ projectRoot })));
+    const tools = byName(createKnowledgeToolset({ defaultProjectRoot: projectRoot }));
 
     await expect(
       tools.knowledge_ingest.execute({ title: "X", content: "Y", scope: "project", project_id: "../escape" }),

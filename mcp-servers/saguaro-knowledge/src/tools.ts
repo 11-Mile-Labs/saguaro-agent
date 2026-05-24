@@ -1,8 +1,8 @@
 import { appendDispatchLog } from "../../core/src/storage/dispatch-log.js";
-import { KnowledgeStorage } from "../../core/src/storage/knowledge-store.js";
-import { resolveStorageBackend } from "../../core/src/storage/backend-factory.js";
 import { assertProjectId } from "../../core/src/storage/backend.js";
-import type { DispatchContextInput, KnowledgeScope, StorageRuntime } from "../../core/src/storage/types.js";
+import type { DispatchContextInput, KnowledgeScope } from "../../core/src/storage/types.js";
+import type { ToolRuntimeOptions } from "../../core/src/storage/tool-runtime.js";
+import { resolveKnowledgeToolContext } from "../../core/src/storage/tool-runtime.js";
 import { z } from "zod";
 
 interface KnowledgeToolDefinition {
@@ -15,6 +15,12 @@ interface KnowledgeToolDefinition {
 const dispatchContextSchema = {
   run_id: z.string().trim().min(1).optional().describe("Workflow run identifier for dispatch logging."),
   phase_id: z.string().trim().min(1).optional().describe("Workflow phase identifier for dispatch logging."),
+  project_path: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe("Absolute path to the project root (parent of .saguaro/config.yaml). Same contract as workflow_* tools."),
 };
 
 const projectScopeSchema = {
@@ -50,15 +56,16 @@ function normalizeTags(value: unknown): string[] | undefined {
 }
 
 async function withDispatchLog(
-  runtime: StorageRuntime,
-  toolName: string,
   args: Record<string, unknown>,
-  action: () => Promise<any>,
+  toolName: string,
+  options: ToolRuntimeOptions,
+  action: (context: ReturnType<typeof resolveKnowledgeToolContext>) => Promise<any>,
 ): Promise<any> {
+  const context = resolveKnowledgeToolContext(args, options);
   const startedAt = Date.now();
   try {
-    const result = await action();
-    await appendDispatchLog(runtime.paths, asDispatchContext(args), {
+    const result = await action(context);
+    await appendDispatchLog(context.runtime.paths, asDispatchContext(args), {
       server: "saguaro-knowledge",
       tool: toolName,
       args,
@@ -67,7 +74,7 @@ async function withDispatchLog(
     });
     return result;
   } catch (error) {
-    await appendDispatchLog(runtime.paths, asDispatchContext(args), {
+    await appendDispatchLog(context.runtime.paths, asDispatchContext(args), {
       server: "saguaro-knowledge",
       tool: toolName,
       args,
@@ -79,10 +86,7 @@ async function withDispatchLog(
   }
 }
 
-export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDefinition[] {
-  const backend = resolveStorageBackend(runtime);
-  const storage = new KnowledgeStorage(runtime, backend);
-
+export function createKnowledgeToolset(options: ToolRuntimeOptions = {}): KnowledgeToolDefinition[] {
   return [
     {
       name: "knowledge_ingest",
@@ -98,7 +102,7 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         source_url: z.string().trim().url().optional().describe("Optional source URL for provenance."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_ingest", args, async () =>
+        withDispatchLog(args, "knowledge_ingest", options, async ({ storage }) =>
           storage.ingest({
             title: String(args.title),
             content: String(args.content),
@@ -120,7 +124,7 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         max_chunks: z.number().int().min(1).max(25).optional().describe("Maximum matching chunks to return."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_query", args, async () =>
+        withDispatchLog(args, "knowledge_query", options, async ({ storage }) =>
           storage.query({
             prompt: String(args.prompt),
             scope: args.scope as KnowledgeScope | undefined,
@@ -140,7 +144,7 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         limit: z.number().int().min(1).max(25).optional().describe("Maximum matching documents to return."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_search", args, async () =>
+        withDispatchLog(args, "knowledge_search", options, async ({ storage }) =>
           storage.search({
             query: String(args.query),
             scope: args.scope as KnowledgeScope | undefined,
@@ -165,7 +169,7 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
           .describe("Optional filters for listing durable knowledge."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_list", args, async () =>
+        withDispatchLog(args, "knowledge_list", options, async ({ storage }) =>
           storage.list(
             args.scope as KnowledgeScope | undefined,
             args.filter as { tags?: string[]; since?: string } | undefined,
@@ -182,7 +186,8 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         document_id: z.string().trim().min(1).describe("Document identifier to fetch."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_get", args, async () => storage.get(String(args.document_id), resolveProjectId(args.project_id))),
+        withDispatchLog(args, "knowledge_get", options, async ({ storage }) =>
+          storage.get(String(args.document_id), resolveProjectId(args.project_id))),
     },
     {
       name: "knowledge_update",
@@ -196,7 +201,7 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         tags: z.array(z.string().trim().min(1)).optional().describe("Optional replacement tags."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_update", args, async () =>
+        withDispatchLog(args, "knowledge_update", options, async ({ storage }) =>
           storage.update(
             String(args.document_id),
             typeof args.content === "string" ? args.content : undefined,
@@ -214,7 +219,8 @@ export function createKnowledgeToolset(runtime: StorageRuntime): KnowledgeToolDe
         document_id: z.string().trim().min(1).describe("Document identifier to delete."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "knowledge_delete", args, async () => storage.delete(String(args.document_id), resolveProjectId(args.project_id))),
+        withDispatchLog(args, "knowledge_delete", options, async ({ storage }) =>
+          storage.delete(String(args.document_id), resolveProjectId(args.project_id))),
     },
   ];
 }

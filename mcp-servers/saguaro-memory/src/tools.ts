@@ -1,9 +1,9 @@
 import { appendDispatchLog } from "../../core/src/storage/dispatch-log.js";
-import { MemoryStorage } from "../../core/src/storage/memory-store.js";
-import { resolveStorageBackend } from "../../core/src/storage/backend-factory.js";
 import { assertProjectId } from "../../core/src/storage/backend.js";
-import type { DispatchContextInput, MemoryScope, StorageRuntime } from "../../core/src/storage/types.js";
+import type { DispatchContextInput, MemoryScope } from "../../core/src/storage/types.js";
 import { z } from "zod";
+import type { ToolRuntimeOptions } from "../../core/src/storage/tool-runtime.js";
+import { resolveMemoryToolContext } from "../../core/src/storage/tool-runtime.js";
 
 interface MemoryToolDefinition {
   name: string;
@@ -15,6 +15,12 @@ interface MemoryToolDefinition {
 const dispatchContextSchema = {
   run_id: z.string().trim().min(1).optional().describe("Workflow run identifier for dispatch logging."),
   phase_id: z.string().trim().min(1).optional().describe("Workflow phase identifier for dispatch logging."),
+  project_path: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe("Absolute path to the project root (parent of .saguaro/config.yaml). Same contract as workflow_* tools."),
 };
 
 const projectScopeSchema = {
@@ -50,15 +56,16 @@ function normalizeTags(value: unknown): string[] | undefined {
 }
 
 async function withDispatchLog(
-  runtime: StorageRuntime,
-  toolName: string,
   args: Record<string, unknown>,
-  action: () => Promise<any>,
+  toolName: string,
+  options: ToolRuntimeOptions,
+  action: (context: ReturnType<typeof resolveMemoryToolContext>) => Promise<any>,
 ): Promise<any> {
+  const context = resolveMemoryToolContext(args, options);
   const startedAt = Date.now();
   try {
-    const result = await action();
-    await appendDispatchLog(runtime.paths, asDispatchContext(args), {
+    const result = await action(context);
+    await appendDispatchLog(context.runtime.paths, asDispatchContext(args), {
       server: "saguaro-memory",
       tool: toolName,
       args,
@@ -67,7 +74,7 @@ async function withDispatchLog(
     });
     return result;
   } catch (error) {
-    await appendDispatchLog(runtime.paths, asDispatchContext(args), {
+    await appendDispatchLog(context.runtime.paths, asDispatchContext(args), {
       server: "saguaro-memory",
       tool: toolName,
       args,
@@ -79,10 +86,7 @@ async function withDispatchLog(
   }
 }
 
-export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefinition[] {
-  const backend = resolveStorageBackend(runtime);
-  const storage = new MemoryStorage(runtime, backend);
-
+export function createMemoryToolset(options: ToolRuntimeOptions = {}): MemoryToolDefinition[] {
   return [
     {
       name: "memory_store",
@@ -96,7 +100,7 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         tags: z.array(z.string().trim().min(1)).optional().describe("Optional tags for retrieval and filtering."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_store", args, async () =>
+        withDispatchLog(args, "memory_store", options, async ({ storage }) =>
           storage.store({
             content: String(args.content),
             scope: args.scope as MemoryScope | undefined,
@@ -118,7 +122,7 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         tags: z.array(z.string().trim().min(1)).optional().describe("Optional tag filter."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_retrieve", args, async () =>
+        withDispatchLog(args, "memory_retrieve", options, async ({ storage }) =>
           storage.retrieve({
             query: String(args.query),
             scope: args.scope as MemoryScope | undefined,
@@ -138,7 +142,8 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         id: z.string().trim().min(1).describe("Memory identifier to pin."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_pin", args, async () => storage.pin(String(args.id), resolveProjectId(args.project_id))),
+        withDispatchLog(args, "memory_pin", options, async ({ storage }) =>
+          storage.pin(String(args.id), resolveProjectId(args.project_id))),
     },
     {
       name: "memory_unpin",
@@ -150,7 +155,8 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         id: z.string().trim().min(1).describe("Memory identifier to unpin."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_unpin", args, async () => storage.unpin(String(args.id), resolveProjectId(args.project_id))),
+        withDispatchLog(args, "memory_unpin", options, async ({ storage }) =>
+          storage.unpin(String(args.id), resolveProjectId(args.project_id))),
     },
     {
       name: "memory_promote",
@@ -163,7 +169,7 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         target_scope: z.enum(["project", "global"]).describe("Broader scope to promote this memory into."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_promote", args, async () =>
+        withDispatchLog(args, "memory_promote", options, async ({ storage }) =>
           storage.promote(String(args.id), args.target_scope as MemoryScope, resolveProjectId(args.project_id))),
     },
     {
@@ -184,10 +190,10 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
           .describe("Optional list filters."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_list", args, async () =>
+        withDispatchLog(args, "memory_list", options, async ({ storage }) =>
           storage.list({
             scope: args.scope as MemoryScope,
-            filter: (args.filter as { tags?: string[]; since?: string; pinned?: boolean } | undefined),
+            filter: args.filter as { tags?: string[]; since?: string; pinned?: boolean } | undefined,
             runId: typeof args.run_id === "string" ? args.run_id : undefined,
             projectId: resolveProjectId(args.project_id),
           })),
@@ -202,7 +208,7 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         scope: memoryScopeSchema.optional().describe("Optional single scope restriction."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_status", args, async () =>
+        withDispatchLog(args, "memory_status", options, async ({ storage }) =>
           storage.status(
             args.scope as MemoryScope | undefined,
             typeof args.run_id === "string" ? args.run_id : undefined,
@@ -219,7 +225,8 @@ export function createMemoryToolset(runtime: StorageRuntime): MemoryToolDefiniti
         id: z.string().trim().min(1).describe("Memory identifier to delete."),
       },
       execute: async (args) =>
-        withDispatchLog(runtime, "memory_delete", args, async () => storage.delete(String(args.id), resolveProjectId(args.project_id))),
+        withDispatchLog(args, "memory_delete", options, async ({ storage }) =>
+          storage.delete(String(args.id), resolveProjectId(args.project_id))),
     },
   ];
 }

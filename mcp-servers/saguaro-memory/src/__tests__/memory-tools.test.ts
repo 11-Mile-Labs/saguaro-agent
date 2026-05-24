@@ -2,6 +2,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { clearToolRuntimeCaches } from "../../../core/src/storage/tool-runtime.js";
 import { setEmbeddingsClientFactoryForTests } from "../../../core/src/storage/embeddings-client.js";
 
 function byName<T extends { name: string }>(items: T[]): Record<string, T> {
@@ -25,6 +26,7 @@ function installFakeVectorBackends() {
 
 afterEach(() => {
   setEmbeddingsClientFactoryForTests(undefined);
+  clearToolRuntimeCaches();
 });
 
 describe("saguaro-memory tool behavior", () => {
@@ -32,11 +34,9 @@ describe("saguaro-memory tool behavior", () => {
     installFakeVectorBackends();
     const projectRoot = await mkdtemp(join(tmpdir(), "saguaro-memory-"));
 
-    const { createStorageRuntime } = await import("../../../core/src/storage/config.js");
     const { createMemoryToolset } = await import("../tools.js");
 
-    const runtime = createStorageRuntime({ projectRoot });
-    const tools = byName(createMemoryToolset(runtime));
+    const tools = byName(createMemoryToolset({ defaultProjectRoot: projectRoot }));
 
     const stored = await tools.memory_store.execute({
       content: "Retry the flaky cache warmup before assuming the API is down.",
