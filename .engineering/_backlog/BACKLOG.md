@@ -10,5 +10,5 @@ _None cataloged._
 
 | Slug | Outcome | Date | Location |
 | --- | --- | --- | --- |
-| workflow-resume-existing-run | promoted | 2026-05-23 | `.engineering/_active/workflow-resume-existing-run/` |
+| workflow-resume-existing-run | promoted / shipped | 2026-05-23 | `.engineering/_archive/workflow-resume-existing-run/` |
 | add-bundled-product-workflow | promoted | 2026-05-23 | `.engineering/_active/add-bundled-product-workflow/` |
