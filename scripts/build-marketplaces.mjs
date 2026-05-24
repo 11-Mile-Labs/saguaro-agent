@@ -99,10 +99,13 @@ async function writeJson(path, value) {
 }
 
 async function copyDist(target, serverName) {
-  const source = resolve(repoRoot, "mcp-servers", serverName, "dist");
-  const destination = resolve(target, "mcp-servers", serverName, "dist");
-  await mkdir(resolve(destination, ".."), { recursive: true });
-  await cp(source, destination, { recursive: true });
+  const sourceDir = resolve(repoRoot, "mcp-servers", serverName);
+  const destinationServerDir = resolve(target, "mcp-servers", serverName);
+  await mkdir(destinationServerDir, { recursive: true });
+  await cp(resolve(sourceDir, "dist"), resolve(destinationServerDir, "dist"), { recursive: true });
+  // The bundle does `require("../package.json")` at runtime to read its
+  // version, so the marketplace install must ship package.json next to dist/.
+  await cp(resolve(sourceDir, "package.json"), resolve(destinationServerDir, "package.json"));
 }
 
 async function copyCommon(target) {
