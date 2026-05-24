@@ -1,6 +1,6 @@
 {
   "name": "saguaro-agent",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Saguaro provides project-local workflow orchestration, persistent memory, and durable knowledge for AI coding harnesses.",
   "contextFileName": "GEMINI.md",
   "skillsDir": "skills",
