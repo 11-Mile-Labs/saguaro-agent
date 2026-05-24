@@ -1,10 +1,14 @@
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createKnowledgeToolset } from "./tools.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "saguaro-knowledge",
-    version: "0.1.0-alpha.2",
+    version,
   });
 
   for (const tool of createKnowledgeToolset()) {

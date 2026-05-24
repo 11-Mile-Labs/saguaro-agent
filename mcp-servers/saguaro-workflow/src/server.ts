@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import {
   appendDispatchLogEntry,
@@ -566,11 +567,14 @@ async function runLoggedTool<T>(
   }
 }
 
+const require = createRequire(import.meta.url);
+const { version: serverVersion } = require("../package.json");
+
 export function createServer(options: WorkflowServiceOptions = {}): McpServer {
   const service = new WorkflowService(options);
   const server = new McpServer({
     name: "saguaro-workflow",
-    version: "0.1.0-alpha.2",
+    version: serverVersion,
   });
 
   server.tool(

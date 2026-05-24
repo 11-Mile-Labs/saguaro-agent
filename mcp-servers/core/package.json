@@ -1,6 +1,6 @@
 {
   "name": "@11-mile-labs/saguaro-core",
-  "version": "0.1.0-alpha.3",
+  "version": "1.0.0-beta.3",
   "description": "Shared workflow core for Saguaro MCP servers.",
   "type": "module",
   "main": "src/index.ts",

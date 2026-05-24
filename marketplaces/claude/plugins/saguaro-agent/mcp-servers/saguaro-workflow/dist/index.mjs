@@ -30359,6 +30359,7 @@ var StdioServerTransport = class {
 
 // src/server.ts
 import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve as resolve6 } from "node:path";
 
 // ../core/src/config.ts
@@ -39689,11 +39690,13 @@ async function runLoggedTool(service, tool, payload, handler) {
     throw error51;
   }
 }
+var require2 = createRequire(import.meta.url);
+var { version: serverVersion } = require2("../package.json");
 function createServer(options = {}) {
   const service = new WorkflowService(options);
   const server = new McpServer({
     name: "saguaro-workflow",
-    version: "0.1.0-alpha.2"
+    version: serverVersion
   });
   server.tool(
     "workflow_list",

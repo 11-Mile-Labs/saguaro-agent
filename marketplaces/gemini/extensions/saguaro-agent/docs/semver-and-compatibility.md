@@ -2,7 +2,7 @@
 
 Saguaro versions two things independently:
 
-- the Saguaro engine itself
+- the Saguaro engine (plugin + MCP packages — **one lockstep `1.0.0-beta.*` version** across the repo root and every `mcp-servers/*` package)
 - each workflow YAML file
 
 ## Engine Semver

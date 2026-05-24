@@ -1,6 +1,6 @@
 {
   "name": "saguaro-agent",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "private": false,
   "description": "Durable workflow, memory, and knowledge foundations for AI coding agents.",
   "type": "module",
@@ -8,6 +8,7 @@
     "saguaro": "./bin/saguaro.mjs"
   },
   "scripts": {
+    "prebuild": "node scripts/sync-versions.mjs",
     "build": "pnpm -r build && node scripts/build-marketplaces.mjs",
     "doctor": "node scripts/doctor.mjs",
     "examples:smoke": "node scripts/run-example-workflows.mjs",
