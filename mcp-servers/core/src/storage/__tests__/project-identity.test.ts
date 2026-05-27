@@ -7,13 +7,13 @@ import { createStorageRuntime } from "../config.js";
 
 describe("createStorageRuntime project identity", () => {
   it("derives projectId from the project-root basename", async () => {
-    const root = join(await mkdtemp(join(tmpdir(), "saguaro-pid-")), "dotman");
-    expect(createStorageRuntime({ projectRoot: root }).projectId).toBe("dotman");
+    const root = join(await mkdtemp(join(tmpdir(), "saguaro-pid-")), "demo-tool");
+    expect(createStorageRuntime({ projectRoot: root }).projectId).toBe("demo-tool");
   });
 
   it("lowercases the basename into a slug", async () => {
-    const root = join(await mkdtemp(join(tmpdir(), "saguaro-pid-")), "Patina-CRM");
-    expect(createStorageRuntime({ projectRoot: root }).projectId).toBe("patina-crm");
+    const root = join(await mkdtemp(join(tmpdir(), "saguaro-pid-")), "Sample-App");
+    expect(createStorageRuntime({ projectRoot: root }).projectId).toBe("sample-app");
   });
 
   it("leaves projectId undefined when the basename is not a valid slug", () => {

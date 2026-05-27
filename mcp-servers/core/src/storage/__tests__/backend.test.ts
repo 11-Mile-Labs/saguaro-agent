@@ -9,14 +9,14 @@ describe("collectionName", () => {
   });
 
   it("embeds a validated project id", () => {
-    expect(collectionName("saguaro_memory", { namespace: "memory", scope: "run", projectId: "patina-crm" }))
-      .toBe("saguaro_memory__patina-crm__memory__run");
+    expect(collectionName("saguaro_memory", { namespace: "memory", scope: "run", projectId: "sample-app" }))
+      .toBe("saguaro_memory__sample-app__memory__run");
   });
 });
 
 describe("assertProjectId", () => {
   it("accepts slug-like ids and returns them", () => {
-    expect(assertProjectId("patina-crm")).toBe("patina-crm");
+    expect(assertProjectId("sample-app")).toBe("sample-app");
     expect(assertProjectId("proj_1.2")).toBe("proj_1.2");
   });
 
@@ -31,16 +31,16 @@ describe("assertProjectId", () => {
 
 describe("collectionKey", () => {
   it("carries projectId for run and project scopes", () => {
-    expect(collectionKey("memory", "project", "dotman")).toEqual({
+    expect(collectionKey("memory", "project", "demo-tool")).toEqual({
       namespace: "memory",
       scope: "project",
-      projectId: "dotman",
+      projectId: "demo-tool",
     });
-    expect(collectionKey("memory", "run", "dotman").projectId).toBe("dotman");
+    expect(collectionKey("memory", "run", "demo-tool").projectId).toBe("demo-tool");
   });
 
   it("drops projectId for the global scope — global is always cross-project", () => {
-    expect(collectionKey("knowledge", "global", "dotman")).toEqual({
+    expect(collectionKey("knowledge", "global", "demo-tool")).toEqual({
       namespace: "knowledge",
       scope: "global",
     });

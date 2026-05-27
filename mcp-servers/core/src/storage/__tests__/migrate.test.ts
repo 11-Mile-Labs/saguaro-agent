@@ -84,9 +84,9 @@ describe("migrateLegacyData", () => {
       memoryDir: join(root, "target", "memory"),
       knowledgeDir: join(root, "target", "knowledge"),
     });
-    await migrateLegacyData({ memoryDir, knowledgeDir }, backend, { projectId: "dotman" });
+    await migrateLegacyData({ memoryDir, knowledgeDir }, backend, { projectId: "demo-tool" });
 
-    const scoped = await backend.list({ namespace: "memory", scope: "project", projectId: "dotman" });
+    const scoped = await backend.list({ namespace: "memory", scope: "project", projectId: "demo-tool" });
     const shared = await backend.list({ namespace: "memory", scope: "global" });
     expect(scoped.map((r) => r.id)).toEqual(["mem_legacy"]);
     expect(shared.map((r) => r.id)).toEqual(["mem_global"]);
