@@ -235,4 +235,122 @@ describe("WorkflowService", () => {
       ])
     );
   });
+
+  test("starts from explicit workflow_path without listing or drifting on resume", async () => {
+    const projectRoot = setupProject();
+    const generatedPath = resolve(projectRoot, ".saguaro", "generated", "dynamic.yaml");
+    mkdirSync(resolve(generatedPath, ".."), { recursive: true });
+    writeFileSync(
+      generatedPath,
+      `
+name: generated-dynamic
+description: generated workflow
+version: 1.0.0
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs: []
+      outputs: [summary]
+`,
+      "utf8"
+    );
+
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+      env: {
+        ...process.env,
+        CODEX_HOME: "/tmp/codex-home",
+        EMBEDDINGS_API_KEY: "test-embeddings",
+        LLM_API_KEY: "test-llm",
+      },
+    });
+
+    const listed = await service.workflowList();
+    expect(listed.workflows.find((workflow) => workflow.name === "generated-dynamic")).toBeUndefined();
+
+    const started = await service.workflowStart({
+      name: "generated-dynamic",
+      workflow_path: ".saguaro/generated/dynamic.yaml",
+      args: { ticket_slug: "generated-path-ticket" },
+    });
+
+    expect(started.workflow_source).toEqual({
+      source: "path",
+      path: generatedPath,
+    });
+
+    writeFileSync(generatedPath, "not: [valid", "utf8");
+
+    const resumed = await service.workflowStart({
+      name: "generated-dynamic",
+      workflow_path: ".saguaro/generated/dynamic.yaml",
+      args: { ticket_slug: "generated-path-ticket" },
+    });
+    expect(resumed.resumed).toBe(true);
+    expect(resumed.run_id).toBe(started.run_id);
+
+    const persistedWorkflow = JSON.parse(
+      readFileSync(resolve(projectRoot, ".saguaro", "runs", started.run_id, "_workflow.json"), "utf8")
+    );
+    expect(persistedWorkflow.description).toBe("generated workflow");
+    expect(persistedWorkflow.phases[0]?.id).toBe("intake");
+
+    const dispatch = await service.workflowDispatchPhase({
+      run_id: started.run_id,
+    });
+    const envelopes = (dispatch as {
+      envelopes?: Array<{
+        phase_id: string;
+        outputs_required: string[];
+        workflow_source?: { source: string; path: string };
+      }>;
+    }).envelopes;
+    expect(envelopes?.[0]?.phase_id).toBe("intake");
+    expect(envelopes?.[0]?.outputs_required).toEqual(["summary"]);
+    expect(envelopes?.[0]?.workflow_source).toEqual({
+      source: "path",
+      path: generatedPath,
+    });
+
+    const status = await service.workflowStatus({ run_id: started.run_id });
+    expect(status.workflow_source).toEqual({
+      source: "path",
+      path: generatedPath,
+    });
+  });
+
+  test("rejects workflow_path when requested name differs from YAML name", async () => {
+    const projectRoot = setupProject();
+    const generatedPath = resolve(projectRoot, ".saguaro", "generated", "dynamic.yaml");
+    mkdirSync(resolve(generatedPath, ".."), { recursive: true });
+    writeFileSync(
+      generatedPath,
+      `
+name: generated-dynamic
+description: generated workflow
+version: 1.0.0
+phases:
+  - id: intake
+    agent: general-purpose
+    contract:
+      inputs: []
+      outputs: [summary]
+`,
+      "utf8"
+    );
+
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+    });
+
+    await expect(
+      service.workflowStart({
+        name: "wrong-name",
+        workflow_path: ".saguaro/generated/dynamic.yaml",
+      })
+    ).rejects.toThrow(/does not match workflow_path name/);
+  });
 });

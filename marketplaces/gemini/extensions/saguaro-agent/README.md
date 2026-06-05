@@ -102,7 +102,7 @@ Memory and knowledge use project-local vector manifests for semantic retrieval. 
 | Tool | Description |
 | --- | --- |
 | `workflow_list` | List bundled and project-local workflows available to run. |
-| `workflow_start` | Start or resume a workflow run; with `ticket_slug` and default `resume: auto`, returns an existing incomplete run instead of resetting state. |
+| `workflow_start` | Start or resume a workflow run by catalog name or explicit `workflow_path`; with `ticket_slug` and default `resume: auto`, returns an existing incomplete run instead of resetting state. |
 | `workflow_find_run` | Find a run indexed by `ticket_slug` and `workflow_name`. |
 | `workflow_resume` | Resume an incomplete run for a ticket or error if none exists. |
 | `workflow_status` | Report current workflow progress, gates, and validation state. |
@@ -115,6 +115,14 @@ Memory and knowledge use project-local vector manifests for semantic retrieval. 
 | `workflow_complete` | Finalize a run and return promotion candidates. |
 | `workflow_runtime_info` | Report harness, model, and backend readiness. |
 | `workflow_validate_yaml` | Validate a workflow file against the public schema. |
+
+`workflow_start` may receive `workflow_path` for a concrete YAML file that is not
+registered in `workflow_list`. Relative paths resolve under `project_path`; absolute
+paths are read directly subject to the host filesystem policy. The YAML `name`
+must match the requested `name`. Saguaro validates and snapshots the workflow into
+the run directory, so resume uses the persisted definition even if the source file
+later changes. Caller-provided phase prose may contain host-specific wording, but
+Saguaro core stays vocabulary-neutral.
 
 ### Memory
 

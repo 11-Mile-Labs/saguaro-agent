@@ -2,14 +2,25 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setEmbeddingsClientFactoryForTests } from "../../../core/src/storage/embeddings-client.js";
 
 function byName<T extends { name: string }>(items: T[]): Record<string, T> {
   return Object.fromEntries(items.map((item) => [item.name, item]));
 }
 
-afterEach(() => setEmbeddingsClientFactoryForTests(undefined));
+const STORAGE_ENV = ["SAGUARO_STORAGE_BACKEND", "VECTOR_STORE_BASE_URL", "SAGUARO_VECTOR_STORE_BASE_URL"];
+
+function clearStorageEnv() {
+  for (const key of STORAGE_ENV) delete process.env[key];
+}
+
+beforeEach(clearStorageEnv);
+
+afterEach(() => {
+  clearStorageEnv();
+  setEmbeddingsClientFactoryForTests(undefined);
+});
 
 describe("saguaro-memory per-call project scoping", () => {
   it("isolates memories written under different project_id values", async () => {

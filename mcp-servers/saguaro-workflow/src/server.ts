@@ -16,6 +16,7 @@ import {
   getWorkflowPhase,
   loadSaguaroConfig,
   loadWorkflowRun,
+  loadWorkflowSourceAtPath,
   markGateApproved,
   readDispatchLogEntries,
   recordPhaseArtifact,
@@ -123,22 +124,86 @@ export class WorkflowService {
 
   async workflowStart(args: {
     name: string;
+    workflow_path?: string;
     args?: Record<string, unknown>;
     resume?: WorkflowResumeMode;
     run_id?: string;
     project_path?: string;
   }) {
     const loadedConfig = this.getLoadedConfig(args.project_path);
-    const catalog = this.getWorkflowCatalog(loadedConfig);
-    const workflow = getWorkflowByName(catalog.workflows, args.name).workflow;
+    if (args.workflow_path && args.run_id) {
+      try {
+        const existing = loadWorkflowRun(loadedConfig, args.run_id);
+        if (existing.status.workflow_name !== args.name) {
+          throw new Error(
+            `Run "${args.run_id}" is for workflow "${existing.status.workflow_name}", not "${args.name}".`
+          );
+        }
+        return {
+          run_id: existing.status.run_id,
+          status_url: existing.runDir,
+          workflow_name: existing.status.workflow_name,
+          workflow_source: existing.status.workflow_source,
+          resumed: true,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("does not exist")) {
+          throw error;
+        }
+      }
+    }
+
+    const ticketSlug = args.args?.ticket_slug ?? args.args?.ticket;
+    const normalizedTicketSlug =
+      typeof ticketSlug === "string" && ticketSlug.trim().length > 0 ? ticketSlug.trim() : null;
+    if (args.workflow_path && normalizedTicketSlug && args.resume !== false) {
+      const indexed = findIndexedRun(loadedConfig, args.name, normalizedTicketSlug);
+      if (indexed) {
+        return {
+          run_id: indexed.run.status.run_id,
+          status_url: indexed.run.runDir,
+          workflow_name: indexed.run.status.workflow_name,
+          workflow_source: indexed.run.status.workflow_source,
+          resumed: true,
+        };
+      }
+
+      if (args.resume === true) {
+        throw new Error(
+          `No incomplete run for ticket "${normalizedTicketSlug}" and workflow "${args.name}".`
+        );
+      }
+    }
+
+    const workflowEntry = args.workflow_path
+      ? loadWorkflowSourceAtPath({
+          projectRoot: loadedConfig.projectRoot,
+          workflowPath: args.workflow_path,
+          engineVersion: "1.0.0",
+        })
+      : getWorkflowByName(this.getWorkflowCatalog(loadedConfig).workflows, args.name);
+
+    if (workflowEntry.name !== args.name) {
+      throw new Error(
+        `workflow_start name "${args.name}" does not match workflow_path name "${workflowEntry.name}".`
+      );
+    }
+
+    const workflow = workflowEntry.workflow;
     const { run, resumed } = startOrResumeWorkflowRun(loadedConfig, workflow, args.args ?? {}, {
       resume: args.resume,
       runId: args.run_id,
+      workflowSource: {
+        source: workflowEntry.source,
+        path: workflowEntry.path,
+      },
     });
     return {
       run_id: run.status.run_id,
       status_url: run.runDir,
       workflow_name: run.status.workflow_name,
+      workflow_source: run.status.workflow_source,
       resumed,
     };
   }
@@ -196,6 +261,7 @@ export class WorkflowService {
     return {
       run_id: run.status.run_id,
       name: run.status.workflow_name,
+      workflow_source: run.status.workflow_source,
       current_layer: run.status.current_layer,
       completed_phases: run.status.completed_phases,
       pending_gates: run.status.approval_gates_pending,
@@ -268,6 +334,7 @@ export class WorkflowService {
         phase,
         phaseIndex,
         artifactPath,
+        workflowSource: run.status.workflow_source,
         harness: this.getHarness(),
         config: loadedConfig.config,
       });
@@ -303,6 +370,7 @@ export class WorkflowService {
       phase,
       phaseIndex,
       artifactPath: artifactPathForPhase(run.runDir, phase.id),
+      workflowSource: run.status.workflow_source,
       harness: this.getHarness(),
       config: loadedConfig.config,
     });
@@ -588,9 +656,10 @@ export function createServer(options: WorkflowServiceOptions = {}): McpServer {
 
   server.tool(
     "workflow_start",
-    "Start or resume a workflow run. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
+    "Start or resume a workflow run by catalog name or explicit workflow_path. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
     {
       name: z.string(),
+      workflow_path: z.string().optional(),
       args: z.record(z.string(), z.unknown()).optional(),
       resume: z.union([z.enum(["auto"]), z.boolean()]).optional(),
       run_id: z.string().optional(),

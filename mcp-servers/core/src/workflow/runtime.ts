@@ -14,6 +14,7 @@ import {
   getUpstreamPhaseIds,
   type WorkflowDefinition,
   type WorkflowPhase,
+  type WorkflowSourceEntry,
 } from "./types.js";
 
 export interface WorkflowGateStatus {
@@ -35,10 +36,16 @@ export interface WorkflowArtifactRecord {
   outputs: string[];
 }
 
+export interface WorkflowSourceMetadata {
+  source: WorkflowSourceEntry["source"];
+  path: string;
+}
+
 export interface WorkflowRunStatus {
   run_id: string;
   workflow_name: string;
   workflow_version: string;
+  workflow_source?: WorkflowSourceMetadata;
   project_root: string;
   started_at: string;
   completed_at: string | null;
@@ -117,12 +124,14 @@ export function createWorkflowRun(
   loadedConfig: LoadedSaguaroConfig,
   workflow: WorkflowDefinition,
   workflowArgs: Record<string, unknown> = {},
-  runId = createRunId(workflow.name, workflowArgs)
+  runId = createRunId(workflow.name, workflowArgs),
+  workflowSource?: WorkflowSourceMetadata
 ): LoadedWorkflowRun {
   const status: WorkflowRunStatus = {
     run_id: runId,
     workflow_name: workflow.name,
     workflow_version: workflow.version ?? "1.0.0",
+    ...(workflowSource ? { workflow_source: workflowSource } : {}),
     project_root: loadedConfig.projectRoot,
     started_at: new Date().toISOString(),
     completed_at: null,
@@ -146,7 +155,7 @@ export function startOrResumeWorkflowRun(
   loadedConfig: LoadedSaguaroConfig,
   workflow: WorkflowDefinition,
   workflowArgs: Record<string, unknown> = {},
-  options: { resume?: WorkflowResumeMode; runId?: string } = {}
+  options: { resume?: WorkflowResumeMode; runId?: string; workflowSource?: WorkflowSourceMetadata } = {}
 ): { run: LoadedWorkflowRun; resumed: boolean } {
   const resume = options.resume ?? "auto";
   const explicitRunId =
@@ -171,7 +180,13 @@ export function startOrResumeWorkflowRun(
       }
     }
 
-    const run = createWorkflowRun(loadedConfig, workflow, workflowArgs, explicitRunId);
+    const run = createWorkflowRun(
+      loadedConfig,
+      workflow,
+      workflowArgs,
+      explicitRunId,
+      options.workflowSource
+    );
     registerTicketRunIndex(loadedConfig, run);
     return { run, resumed: false };
   }
@@ -193,7 +208,13 @@ export function startOrResumeWorkflowRun(
     }
   }
 
-  const run = createWorkflowRun(loadedConfig, workflow, workflowArgs);
+  const run = createWorkflowRun(
+    loadedConfig,
+    workflow,
+    workflowArgs,
+    undefined,
+    options.workflowSource
+  );
   registerTicketRunIndex(loadedConfig, run);
   return { run, resumed: false };
 }

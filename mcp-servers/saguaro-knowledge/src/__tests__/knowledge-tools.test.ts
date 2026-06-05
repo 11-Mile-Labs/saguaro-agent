@@ -1,7 +1,7 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setEmbeddingsClientFactoryForTests } from "../../../core/src/storage/embeddings-client.js";
 import { setSynthesisClientFactoryForTests } from "../../../core/src/storage/synthesis-openai-client.js";
 
@@ -29,7 +29,16 @@ function installFakeBackends() {
   }));
 }
 
+const STORAGE_ENV = ["SAGUARO_STORAGE_BACKEND", "VECTOR_STORE_BASE_URL", "SAGUARO_VECTOR_STORE_BASE_URL"];
+
+function clearStorageEnv() {
+  for (const key of STORAGE_ENV) delete process.env[key];
+}
+
+beforeEach(clearStorageEnv);
+
 afterEach(() => {
+  clearStorageEnv();
   setEmbeddingsClientFactoryForTests(undefined);
   setSynthesisClientFactoryForTests(undefined);
 });

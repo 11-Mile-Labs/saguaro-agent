@@ -83,6 +83,30 @@ export function discoverWorkflows(args: DiscoverWorkflowsArgs): DiscoverWorkflow
   };
 }
 
+export function loadWorkflowSourceAtPath(args: {
+  projectRoot: string;
+  workflowPath: string;
+  engineVersion?: string;
+}): WorkflowSourceEntry {
+  const resolvedPath = resolve(args.projectRoot, args.workflowPath);
+  const validation = validateWorkflowYamlFile(resolvedPath, args.engineVersion ?? "1.0.0");
+
+  if (!validation.valid || !validation.workflow) {
+    throw new Error(
+      validation.errors.map((issue) => `${issue.path}: ${issue.message}`).join("; ")
+    );
+  }
+
+  const workflow = validation.workflow;
+  return {
+    name: workflow.name,
+    description: workflow.description,
+    source: "path",
+    path: resolvedPath,
+    workflow,
+  };
+}
+
 export function getWorkflowByName(
   workflows: WorkflowSourceEntry[],
   workflowName: string

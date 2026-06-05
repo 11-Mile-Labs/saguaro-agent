@@ -71,7 +71,7 @@ Prefer **one** primary entry point for hosts (`workflow_start` with auto-resume)
 ## Non-goals
 
 - No `ticket_path` or client/project queue roots in public MCP (consumers resolve paths).
-- No Captain Goose–specific ticket file layout in this repo.
+- No consumer-specific ticket file layout in this repo.
 - Replacing `/work` in downstream plugins (they can deprecate once start-or-resume works).
 
 ## Implementation notes

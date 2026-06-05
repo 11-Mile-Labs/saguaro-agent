@@ -30802,6 +30802,23 @@ function discoverWorkflows(args) {
     invalid
   };
 }
+function loadWorkflowSourceAtPath(args) {
+  const resolvedPath = resolve2(args.projectRoot, args.workflowPath);
+  const validation = validateWorkflowYamlFile(resolvedPath, args.engineVersion ?? "1.0.0");
+  if (!validation.valid || !validation.workflow) {
+    throw new Error(
+      validation.errors.map((issue2) => `${issue2.path}: ${issue2.message}`).join("; ")
+    );
+  }
+  const workflow = validation.workflow;
+  return {
+    name: workflow.name,
+    description: workflow.description,
+    source: "path",
+    path: resolvedPath,
+    workflow
+  };
+}
 function getWorkflowByName(workflows, workflowName) {
   const entry = workflows.find((workflow) => workflow.name === workflowName);
   if (!entry) {
@@ -30946,6 +30963,7 @@ function generateWorkflowEnvelope(args) {
     envelope_version: 1,
     run_id: args.runId,
     workflow_name: args.workflow.name,
+    ...args.workflowSource ? { workflow_source: args.workflowSource } : {},
     phase_id: args.phase.id,
     phase_index: args.phaseIndex,
     agent: args.phase.agent,
@@ -31190,11 +31208,12 @@ function writeRunFiles(loadedConfig, workflow, status) {
   }
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
 }
-function createWorkflowRun(loadedConfig, workflow, workflowArgs = {}, runId = createRunId(workflow.name, workflowArgs)) {
+function createWorkflowRun(loadedConfig, workflow, workflowArgs = {}, runId = createRunId(workflow.name, workflowArgs), workflowSource) {
   const status = {
     run_id: runId,
     workflow_name: workflow.name,
     workflow_version: workflow.version ?? "1.0.0",
+    ...workflowSource ? { workflow_source: workflowSource } : {},
     project_root: loadedConfig.projectRoot,
     started_at: (/* @__PURE__ */ new Date()).toISOString(),
     completed_at: null,
@@ -31230,7 +31249,13 @@ function startOrResumeWorkflowRun(loadedConfig, workflow, workflowArgs = {}, opt
         throw error51;
       }
     }
-    const run2 = createWorkflowRun(loadedConfig, workflow, workflowArgs, explicitRunId);
+    const run2 = createWorkflowRun(
+      loadedConfig,
+      workflow,
+      workflowArgs,
+      explicitRunId,
+      options.workflowSource
+    );
     registerTicketRunIndex(loadedConfig, run2);
     return { run: run2, resumed: false };
   }
@@ -31247,7 +31272,13 @@ function startOrResumeWorkflowRun(loadedConfig, workflow, workflowArgs = {}, opt
       );
     }
   }
-  const run = createWorkflowRun(loadedConfig, workflow, workflowArgs);
+  const run = createWorkflowRun(
+    loadedConfig,
+    workflow,
+    workflowArgs,
+    void 0,
+    options.workflowSource
+  );
   registerTicketRunIndex(loadedConfig, run);
   return { run, resumed: false };
 }
@@ -39364,16 +39395,71 @@ var WorkflowService = class {
   }
   async workflowStart(args) {
     const loadedConfig = this.getLoadedConfig(args.project_path);
-    const catalog = this.getWorkflowCatalog(loadedConfig);
-    const workflow = getWorkflowByName(catalog.workflows, args.name).workflow;
+    if (args.workflow_path && args.run_id) {
+      try {
+        const existing = loadWorkflowRun(loadedConfig, args.run_id);
+        if (existing.status.workflow_name !== args.name) {
+          throw new Error(
+            `Run "${args.run_id}" is for workflow "${existing.status.workflow_name}", not "${args.name}".`
+          );
+        }
+        return {
+          run_id: existing.status.run_id,
+          status_url: existing.runDir,
+          workflow_name: existing.status.workflow_name,
+          workflow_source: existing.status.workflow_source,
+          resumed: true
+        };
+      } catch (error51) {
+        const message = error51 instanceof Error ? error51.message : String(error51);
+        if (!message.includes("does not exist")) {
+          throw error51;
+        }
+      }
+    }
+    const ticketSlug = args.args?.ticket_slug ?? args.args?.ticket;
+    const normalizedTicketSlug = typeof ticketSlug === "string" && ticketSlug.trim().length > 0 ? ticketSlug.trim() : null;
+    if (args.workflow_path && normalizedTicketSlug && args.resume !== false) {
+      const indexed = findIndexedRun(loadedConfig, args.name, normalizedTicketSlug);
+      if (indexed) {
+        return {
+          run_id: indexed.run.status.run_id,
+          status_url: indexed.run.runDir,
+          workflow_name: indexed.run.status.workflow_name,
+          workflow_source: indexed.run.status.workflow_source,
+          resumed: true
+        };
+      }
+      if (args.resume === true) {
+        throw new Error(
+          `No incomplete run for ticket "${normalizedTicketSlug}" and workflow "${args.name}".`
+        );
+      }
+    }
+    const workflowEntry = args.workflow_path ? loadWorkflowSourceAtPath({
+      projectRoot: loadedConfig.projectRoot,
+      workflowPath: args.workflow_path,
+      engineVersion: "1.0.0"
+    }) : getWorkflowByName(this.getWorkflowCatalog(loadedConfig).workflows, args.name);
+    if (workflowEntry.name !== args.name) {
+      throw new Error(
+        `workflow_start name "${args.name}" does not match workflow_path name "${workflowEntry.name}".`
+      );
+    }
+    const workflow = workflowEntry.workflow;
     const { run, resumed } = startOrResumeWorkflowRun(loadedConfig, workflow, args.args ?? {}, {
       resume: args.resume,
-      runId: args.run_id
+      runId: args.run_id,
+      workflowSource: {
+        source: workflowEntry.source,
+        path: workflowEntry.path
+      }
     });
     return {
       run_id: run.status.run_id,
       status_url: run.runDir,
       workflow_name: run.status.workflow_name,
+      workflow_source: run.status.workflow_source,
       resumed
     };
   }
@@ -39416,6 +39502,7 @@ var WorkflowService = class {
     return {
       run_id: run.status.run_id,
       name: run.status.workflow_name,
+      workflow_source: run.status.workflow_source,
       current_layer: run.status.current_layer,
       completed_phases: run.status.completed_phases,
       pending_gates: run.status.approval_gates_pending,
@@ -39470,6 +39557,7 @@ var WorkflowService = class {
         phase,
         phaseIndex,
         artifactPath,
+        workflowSource: run.status.workflow_source,
         harness: this.getHarness(),
         config: loadedConfig.config
       });
@@ -39497,6 +39585,7 @@ var WorkflowService = class {
       phase,
       phaseIndex,
       artifactPath: artifactPathForPhase(run.runDir, phase.id),
+      workflowSource: run.status.workflow_source,
       harness: this.getHarness(),
       config: loadedConfig.config
     });
@@ -39708,9 +39797,10 @@ function createServer(options = {}) {
   );
   server.tool(
     "workflow_start",
-    "Start or resume a workflow run. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
+    "Start or resume a workflow run by catalog name or explicit workflow_path. With ticket_slug and resume auto (default), returns an existing incomplete run instead of resetting state.",
     {
       name: external_exports.string(),
+      workflow_path: external_exports.string().optional(),
       args: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
       resume: external_exports.union([external_exports.enum(["auto"]), external_exports.boolean()]).optional(),
       run_id: external_exports.string().optional(),
