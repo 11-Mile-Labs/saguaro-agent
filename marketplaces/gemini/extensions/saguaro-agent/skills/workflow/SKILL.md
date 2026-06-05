@@ -9,6 +9,33 @@ license: MIT
 
 Use this skill for `/workflow run <workflow-name>`.
 
+## When Users Should Invoke This Skill
+
+Invoke `workflow` when the task benefits from a repeatable process with phases, validation, artifacts, approval gates, or resume behavior.
+
+Good fits:
+
+- bug fixing with reproduction and regression safety
+- feature work with planning, implementation, review, and docs
+- migrations or architecture work with approval before code changes
+- project-local workflows created with `create-workflow`
+
+Avoid it for narrow questions, tiny edits, or exploration where no workflow fits.
+
+## User Prompts
+
+```text
+/workflow run engineering-lite --ticket improve-empty-state
+```
+
+```text
+Use the Saguaro workflow skill. Run bugfix for ticket checkout-rounding-error.
+```
+
+```text
+Run the project-local support-triage workflow for ticket login-loop.
+```
+
 ## Setup
 
 1. Parse the workflow name plus any `--ticket` or repeated `--arg key=value` pairs from the user request.

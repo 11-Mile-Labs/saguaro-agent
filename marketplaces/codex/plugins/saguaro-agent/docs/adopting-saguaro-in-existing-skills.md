@@ -4,6 +4,8 @@ This guide explains how to update an existing agent skill so it benefits from Sa
 
 The goal is not to rewrite your skill. The goal is to add durable context habits around the work the skill already does.
 
+For user-facing invocation examples and bundled skill explanations, see [skills-and-agents.md](./skills-and-agents.md).
+
 ## Adoption Pattern
 
 Add three small sections to the skill:

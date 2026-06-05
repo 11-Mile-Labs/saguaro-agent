@@ -10,6 +10,17 @@ function env(name, fallback = "") {
   return process.env[name] ?? fallback;
 }
 
+function storageBackend() {
+  const explicit = process.env.SAGUARO_STORAGE_BACKEND?.trim().toLowerCase();
+  if (explicit === "chromadb" || explicit === "filesystem") {
+    return explicit;
+  }
+
+  return process.env.SAGUARO_VECTOR_STORE_BASE_URL || process.env.VECTOR_STORE_BASE_URL
+    ? "chromadb"
+    : "filesystem";
+}
+
 function configTemplate() {
   return `embeddings:
   base_url: "${env("EMBEDDINGS_BASE_URL", "http://localhost:1234/v1")}"
@@ -26,6 +37,9 @@ redaction:
   enabled: true
   disabled_rules: ""
   additional_allow_patterns: ""
+
+storage:
+  backend: ${storageBackend()}
 
 memory:
   collection: "saguaro_memory"

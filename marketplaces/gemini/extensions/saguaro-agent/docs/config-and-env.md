@@ -1,4 +1,4 @@
-# Config And Environment
+# Project Config Schema
 
 Saguaro uses one project-local config file:
 
@@ -6,9 +6,11 @@ Saguaro uses one project-local config file:
 .saguaro/config.yaml
 ```
 
-That file belongs to the project using Saguaro, not to a home directory or machine-global shell profile.
+This is the Saguaro project YAML surface. Some teams may describe it generically as `project.yaml`, but the canonical v1 path is `.saguaro/config.yaml`.
 
-## Example
+The file belongs to the project using Saguaro. It should be safe to commit only when provider URLs are public, generic, or intentionally local, and when the file contains model names, collection names, and environment variable names instead of secret values. Do not commit private hostnames, LAN addresses, customer infrastructure, account identifiers, or tokens.
+
+## Complete Example
 
 ```yaml
 embeddings:
@@ -18,23 +20,71 @@ embeddings:
 
 llm:
   base_url: "https://api.openai.com/v1"
-  model: "gpt-5.4"
+  model: "hosted-chat-model"
   api_key_env: LLM_API_KEY
   temperature: 0
 
 storage:
-  # backend: chromadb | filesystem — optional; inferred from VECTOR_STORE_BASE_URL when omitted.
-  backend: chromadb
-  # vector_store_base_url: http://localhost:8000  # optional; env VECTOR_STORE_BASE_URL takes precedence.
+  backend: filesystem
 
 redaction:
   enabled: true
-  # Comma-separated rule names to disable if a rule breaks legitimate content.
-  # Available built-ins: private-key, authorization-bearer, openai-style-token,
-  # github-token, aws-access-key, assignment-secret.
   disabled_rules: ""
-  # Comma-separated JavaScript regex patterns to protect from redaction.
   additional_allow_patterns: ""
+
+memory:
+  collection: "saguaro_memory"
+  data_dir: ".saguaro/data/memory"
+
+knowledge:
+  collection: "saguaro_knowledge"
+  data_dir: ".saguaro/data/knowledge"
+  chunk_size: 900
+
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+
+model_tiers:
+  claude:
+    standard: claude-standard-model
+    deep: claude-deep-model
+    surgeon: claude-high-reasoning-model
+  codex:
+    standard: codex-standard-model
+    deep: codex-deep-model
+    surgeon: codex-high-reasoning-model
+  gemini:
+    standard: gemini-standard-model
+    deep: gemini-deep-model
+    surgeon: gemini-high-reasoning-model
+
+workflows_dir: .saguaro/workflows
+runs_dir: .saguaro/runs
+```
+
+For public repositories, prefer omitting `storage.vector_store_base_url`. Pass the ChromaDB URL through the harness environment as `VECTOR_STORE_BASE_URL` unless the URL is intentionally public or local and safe to commit.
+
+## Minimal Filesystem Config
+
+Use this when you want a zero-config local store:
+
+```yaml
+embeddings:
+  base_url: "http://localhost:1234/v1"
+  model: "text-embedding-bge-m3"
+  api_key_env: EMBEDDINGS_API_KEY
+
+llm:
+  base_url: "http://localhost:1234/v1"
+  model: "local-chat"
+  api_key_env: LLM_API_KEY
+  temperature: 0
+
+storage:
+  backend: filesystem
 
 memory:
   collection: "saguaro_memory"
@@ -43,82 +93,262 @@ knowledge:
   collection: "saguaro_knowledge"
   chunk_size: 900
 
-defaults:
-  model_tier: standard
-
-model_tiers:
-  claude:
-    standard: claude-sonnet-4-6
-    deep: claude-opus-4-7
-    surgeon: claude-opus-4-7-extended-thinking
-  codex:
-    standard: gpt-5-codex-medium
-    deep: gpt-5-codex-high
-    surgeon: gpt-5-codex-pro
-  gemini:
-    standard: gemini-2.5-flash
-    deep: gemini-2.5-pro
-    surgeon: gemini-2.5-pro-thinking
-
 workflows_dir: .saguaro/workflows
 runs_dir: .saguaro/runs
 ```
 
-## Secret Handling
+## Minimal ChromaDB Config
 
-- YAML stores environment variable names such as `EMBEDDINGS_API_KEY`.
-- YAML does not store the secret values themselves.
-- The host harness passes those variables into the MCP server process at launch time.
+Use this when the vector store URL is supplied by the harness environment:
 
-## Backend Responsibilities
+```yaml
+embeddings:
+  base_url: "https://api.openai.com/v1"
+  model: "text-embedding-3-small"
+  api_key_env: EMBEDDINGS_API_KEY
 
-Saguaro uses OpenAI-compatible APIs for embeddings and optional answer synthesis, plus a configurable storage backend for durable vector persistence.
+llm:
+  base_url: "https://api.openai.com/v1"
+  model: "hosted-chat-model"
+  api_key_env: LLM_API_KEY
 
-- `embeddings` points at an OpenAI-compatible embeddings endpoint. Saguaro calls `/embeddings` to produce vectors.
-- `llm` points at an OpenAI-compatible chat completions endpoint. Saguaro calls `/chat/completions` for `knowledge_query` synthesis.
-- `storage` controls where vectors and records are persisted and searched. The `filesystem` backend requires no external service and is the zero-config fallback. The `chromadb` backend is the first durable backend; it persists data to a running ChromaDB instance and runs server-side similarity search. If a configured backend is unreachable, the tool call fails with a clear error — Saguaro never silently falls back to `filesystem` when a durable backend was explicitly or implicitly requested.
-- `memory.collection` names the sentence-to-paragraph memory collection.
-- `knowledge.collection` names the document collection.
-- `redaction` controls the built-in secret redaction guardrail. It defaults to enabled. Disable specific rules with `disabled_rules`, or add narrow regex allow patterns with `additional_allow_patterns` when a rule mangles legitimate content. Allow patterns protect the exact matched span, so include the surrounding assignment text when that is what triggers the rule.
+storage:
+  backend: chromadb
+
+memory:
+  collection: "saguaro_memory"
+
+knowledge:
+  collection: "saguaro_knowledge"
+```
+
+Then pass:
+
+```bash
+export VECTOR_STORE_BASE_URL="http://localhost:8000"
+export VECTOR_STORE_API_KEY="" # optional
+```
+
+## Schema Reference
+
+The workflow server validates project config with the schema below. Memory and knowledge servers accept the same public shape but also preserve backward-compatible aliases such as `memory.path` and `knowledge.path`. Keep the file small and explicit.
+
+| Field | Type | Required | Default | Purpose |
+| --- | --- | --- | --- | --- |
+| `embeddings` | object | Yes | none | OpenAI-compatible embedding endpoint used by memory and knowledge retrieval. |
+| `llm` | object | No | none | OpenAI-compatible chat endpoint used by `knowledge_query` synthesis and runtime checks. |
+| `storage` | object | No | inferred | Storage backend selection and optional vector store URL. |
+| `redaction` | object | No | enabled by runtime defaults | Secret redaction controls for memory and knowledge writes. |
+| `memory` | object | No | runtime defaults | Memory collection and local filesystem path settings. |
+| `knowledge` | object | No | runtime defaults | Knowledge collection, local path, and chunking settings. |
+| `defaults` | object | No | workflow defaults | Default model tier, effort, and lookup scopes. |
+| `model_tiers` | object | No | none | Harness-specific concrete model names for logical tiers. |
+| `workflows_dir` | string | No | `.saguaro/workflows` | Project-local workflow directory. |
+| `runs_dir` | string | No | `.saguaro/runs` | Workflow run state directory. |
+
+### `embeddings`
+
+```yaml
+embeddings:
+  base_url: "https://api.openai.com/v1"
+  model: "text-embedding-3-small"
+  api_key_env: EMBEDDINGS_API_KEY
+```
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `base_url` | string | Recommended | Base URL for an OpenAI-compatible API. |
+| `url` | string | No | Backward-compatible alias accepted by runtime config. Prefer `base_url`. |
+| `model` | string | Recommended | Embedding model name. |
+| `api_key_env` | string | Yes | Name of the environment variable containing the API key. |
+| `collection` | string | No | Accepted by the shared endpoint schema, but collection names usually belong under `memory` and `knowledge`. |
+
+### `llm`
+
+```yaml
+llm:
+  base_url: "https://api.openai.com/v1"
+  model: "hosted-chat-model"
+  api_key_env: LLM_API_KEY
+  temperature: 0
+```
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `base_url` | string | Recommended | Base URL for an OpenAI-compatible chat API. |
+| `url` | string | No | Backward-compatible alias accepted by runtime config. Prefer `base_url`. |
+| `model` | string | Recommended | Chat model name. |
+| `api_key_env` | string | Yes when `llm` is present | Name of the environment variable containing the API key. |
+| `temperature` | number | No | Provider temperature setting for synthesis. |
+| `collection` | string | No | Accepted by the shared endpoint schema but rarely useful here. |
+
+### `storage`
+
+```yaml
+storage:
+  backend: chromadb
+  vector_store_base_url: "http://localhost:8000"
+```
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `backend` | `filesystem` or `chromadb` | No | Explicit backend selector. |
+| `vector_store_base_url` | string | No | ChromaDB base URL. Env vars take precedence. |
+
+Storage backend resolution order:
+
+1. `storage.backend` in `.saguaro/config.yaml`
+2. `SAGUARO_STORAGE_BACKEND`
+3. infer `chromadb` when `SAGUARO_VECTOR_STORE_BASE_URL` or `VECTOR_STORE_BASE_URL` is set
+4. fall back to `filesystem`
+
+ChromaDB URL resolution order:
+
+1. `SAGUARO_VECTOR_STORE_BASE_URL`
+2. `VECTOR_STORE_BASE_URL`
+3. `storage.vector_store_base_url`
+
+If `chromadb` is selected and no URL is available, the tool call fails. Saguaro does not silently fall back to `filesystem` when a durable backend was selected.
+
+### `redaction`
+
+```yaml
+redaction:
+  enabled: true
+  disabled_rules: ""
+  additional_allow_patterns: ""
+```
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `enabled` | boolean | No | Set `false` only for controlled tests or special internal tooling. |
+| `disabled_rules` | string | No | Comma-separated built-in rule names to disable. |
+| `additional_allow_patterns` | string | No | Comma-separated JavaScript regex patterns whose matches should be protected from redaction. |
+
+Built-in redaction is a guardrail, not permission to store secrets. Do not intentionally put tokens, keys, private infrastructure, client data, or personal machine details into memory or knowledge.
+
+### `memory`
+
+```yaml
+memory:
+  collection: "saguaro_memory"
+  data_dir: ".saguaro/data/memory"
+```
+
+| Field | Type | Required | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `collection` | string | No | `saguaro_memory` | Base collection name for memory records. |
+| `data_dir` | string | No | `.saguaro/data/memory` | Filesystem backend data directory. |
+| `path` | string | No | `.saguaro/data/memory` | Alias for `data_dir`; prefer `data_dir`. |
+
+### `knowledge`
+
+```yaml
+knowledge:
+  collection: "saguaro_knowledge"
+  data_dir: ".saguaro/data/knowledge"
+  chunk_size: 900
+```
+
+| Field | Type | Required | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `collection` | string | No | `saguaro_knowledge` | Base collection name for knowledge documents. |
+| `data_dir` | string | No | `.saguaro/data/knowledge` | Filesystem backend data directory. |
+| `path` | string | No | `.saguaro/data/knowledge` | Alias for `data_dir`; prefer `data_dir`. |
+| `chunk_size` | positive integer | No | runtime default | Approximate content chunk size for document ingestion. |
+
+### `defaults`
+
+```yaml
+defaults:
+  model_tier: standard
+  effort: medium
+  memory_scope: [run, project]
+  knowledge_scope: [project]
+```
+
+| Field | Type | Required | Default | Allowed Values |
+| --- | --- | --- | --- | --- |
+| `model_tier` | string | No | `standard` | `standard`, `deep`, `surgeon` |
+| `effort` | string | No | `medium` | `low`, `medium`, `high` |
+| `memory_scope` | string array | No | `[run, project]` | `run`, `project`, `global` |
+| `knowledge_scope` | string array | No | `[project]` | Use `project` and `global`; `run` is reserved for future run-scoped knowledge behavior. |
+
+Workflow phase defaults can override these at the workflow level. Phase-level values override workflow defaults.
+
+### `model_tiers`
+
+```yaml
+model_tiers:
+  codex:
+    standard: codex-standard-model
+    deep: codex-deep-model
+    surgeon: codex-high-reasoning-model
+```
+
+Supported harness keys:
+
+- `claude`
+- `codex`
+- `gemini`
+
+Supported tier keys:
+
+- `standard`
+- `deep`
+- `surgeon`
+
+Workflows should use logical tiers, not concrete model names. This keeps a workflow portable across harnesses.
+
+### `workflows_dir`
+
+```yaml
+workflows_dir: .saguaro/workflows
+```
+
+Relative paths resolve from the project root. Project workflows shadow bundled workflows by `name`.
+
+### `runs_dir`
+
+```yaml
+runs_dir: .saguaro/runs
+```
+
+Relative paths resolve from the project root. Saguaro stores workflow run state, dispatch logs, artifacts, and ticket indexes here.
+
+## Environment Variables
+
+Every provider key also accepts a `SAGUARO_`-prefixed override form.
+
+| Purpose | Primary Env Var | Override Env Var |
+| --- | --- | --- |
+| Embeddings base URL | `EMBEDDINGS_BASE_URL` | `SAGUARO_EMBEDDINGS_BASE_URL` |
+| Embeddings model | `EMBEDDINGS_MODEL` | `SAGUARO_EMBEDDINGS_MODEL` |
+| Embeddings API key | `EMBEDDINGS_API_KEY` | `SAGUARO_EMBEDDINGS_API_KEY` |
+| Chat base URL | `LLM_BASE_URL` | `SAGUARO_LLM_BASE_URL` |
+| Chat model | `LLM_MODEL` | `SAGUARO_LLM_MODEL` |
+| Chat API key | `LLM_API_KEY` | `SAGUARO_LLM_API_KEY` |
+| Storage backend | none | `SAGUARO_STORAGE_BACKEND` |
+| ChromaDB URL | `VECTOR_STORE_BASE_URL` | `SAGUARO_VECTOR_STORE_BASE_URL` |
+| ChromaDB API key | `VECTOR_STORE_API_KEY` | `SAGUARO_VECTOR_STORE_API_KEY` |
 
 ## What Saguaro Will Not Read
 
-Saguaro should not read user-home shell profiles, machine-local env files, or other home-directory config files.
+Saguaro reads project-local `.saguaro/config.yaml` and process environment variables passed by the host MCP configuration.
+
+It should not read:
+
+- shell startup files
+- user-home env files
+- machine-local profile scripts
+- private project config outside the target project
 
 If the host does not pass a required environment variable, the relevant tool should fail with a clear configuration error.
 
-## Compatibility
-
-The public Saguaro tool surface stays vendor-neutral. The v1 backend contract is intentionally small: OpenAI-compatible embeddings are required, a pluggable storage backend provides vector persistence and similarity search, and OpenAI-compatible chat completions can synthesize `knowledge_query` answers.
-
-Local development can use LM Studio, Ollama's OpenAI-compatible server, hosted OpenAI, hosted Anthropic through an OpenAI-compatible proxy, or any equivalent provider. ChromaDB is supported as a durable vector store via `VECTOR_STORE_BASE_URL`, behind the same public `memory_*` and `knowledge_*` tool surface — no tool-name or client-side changes required. Additional external vector databases can be added behind the same storage contract without changing the public MCP tool names.
-
-## Environment Aliases
-
-Saguaro accepts these environment variable names directly. Every key also accepts a `SAGUARO_`-prefixed override form (e.g. `SAGUARO_EMBEDDINGS_BASE_URL` overrides `EMBEDDINGS_BASE_URL`).
-
-**Embeddings** — text → vector (`/embeddings`):
-
-- `EMBEDDINGS_BASE_URL`
-- `EMBEDDINGS_MODEL`
-- `EMBEDDINGS_API_KEY`
-
-**LLM** — prompt → answer (`/chat/completions`, used by `knowledge_query` synthesis):
-
-- `LLM_BASE_URL`
-- `LLM_MODEL`
-- `LLM_API_KEY`
-
-**Storage backend** — vector persistence:
-
-- `SAGUARO_STORAGE_BACKEND` — `chromadb` or `filesystem`; inferred from `VECTOR_STORE_BASE_URL` when omitted.
-- `VECTOR_STORE_BASE_URL` — base URL of the ChromaDB instance (e.g. `http://localhost:8000`).
-- `VECTOR_STORE_API_KEY` — API key for the vector store, if required.
-
 ## Per-Call Project Isolation
 
-All `memory_*` and `knowledge_*` tools accept an optional `project_id` argument. When set, Saguaro scopes all reads and writes to that project workspace, allowing one running server to serve multiple projects without data leakage between them.
+All `memory_*` and `knowledge_*` tools accept an optional `project_id` argument. When set, Saguaro scopes reads and writes to that project workspace, allowing one running server to serve multiple projects without data leakage between them.
 
-`project_id` must be a slug matching `[A-Za-z0-9][A-Za-z0-9._-]*` with no `..` components. When omitted, the server uses its configured default workspace.
+`project_id` must match `[A-Za-z0-9][A-Za-z0-9._-]*`, must start with an alphanumeric character, and must not contain `..`.
 
-The `global` scope is always cross-project: a `global`-scoped memory or knowledge document is shared across every workspace regardless of any `project_id` argument.
+The `global` scope is always cross-project. A global memory or knowledge document is shared regardless of `project_id`.

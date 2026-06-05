@@ -9,6 +9,24 @@ license: MIT
 
 Use this skill for `/saguaro init`.
 
+## When Users Should Invoke This Skill
+
+Invoke `saguaro` when a project does not yet have `.saguaro/config.yaml` and `.saguaro/workflows/`.
+
+Good prompts:
+
+```text
+/saguaro init
+```
+
+```text
+Initialize Saguaro in this project with a filesystem storage config.
+```
+
+```text
+Initialize Saguaro and copy a starter engineering workflow.
+```
+
 ## Goal
 
 Create the smallest safe project-local Saguaro scaffold:
@@ -26,7 +44,7 @@ Create the smallest safe project-local Saguaro scaffold:
    - `saguaro doctor`
    - `saguaro smoke`
    - `/workflow run engineering`
-   - `node scripts/lint-workflow-yaml.mjs --user`
+   - `workflow_validate_yaml` for any project-local workflow drafts
 
 ## Config template
 

@@ -46,6 +46,18 @@ phases:
         - intake_summary: required
 ```
 
+## Create a project workflow
+
+Use the bundled `create-workflow` skill when you want an agent to interview you and draft a valid workflow:
+
+```text
+/create-workflow support-triage
+```
+
+The skill writes `.saguaro/workflows/<name>.yaml` and validates it with `workflow_validate_yaml` when the MCP tool is available.
+
+Manual authoring guidance lives in [../docs/workflow-authoring.md](../docs/workflow-authoring.md), and the full schema reference lives in [../docs/workflow-yaml-schema.md](../docs/workflow-yaml-schema.md).
+
 ## Validation
 
 Run the bundled linter from the repo root:

@@ -9,9 +9,16 @@ license: MIT
 
 Use this skill when Saguaro is installed, `.saguaro/` exists, or the user asks how Saguaro changes agent work.
 
+## When Users Should Invoke This Skill
+
+Invoke `using-saguaro` at the start of substantial work when the user wants the agent to preserve context and avoid starting cold.
+
+Good prompts: "Use Saguaro for this repo before planning", "check memory and knowledge first", or "store durable lessons before closeout".
+
 For user onboarding, prefer the repository guides:
 
 - `docs/getting-started.md`
+- `docs/skills-and-agents.md`
 - `docs/adopting-saguaro-in-existing-skills.md`
 
 Saguaro provides three capabilities that should work together:
@@ -40,22 +47,10 @@ For each substantial user request:
 4. If no workflow fits, continue normally but keep using memory and knowledge.
 5. When the task creates durable knowledge, store or ingest it before finalizing.
 
-## Red Flags
-
-These thoughts usually mean you are about to bypass Saguaro incorrectly:
-
-- "I will just inspect the repo first." Query memory/knowledge first when prior context could matter.
-- "This is only a quick fix." Quick fixes still repeat old mistakes when context is missing.
-- "I remember the decision." Retrieve the current memory or knowledge entry instead of trusting recollection.
-- "The workflow is probably too heavy." Check `workflow_list`; use a workflow when one matches the work.
-- "I will store the lesson at the end." Store durable findings when they appear, while the evidence is fresh.
-
 ## Choosing The Surface
 
 Use `memory_*` for concise lessons, decisions, gotchas, and outcomes.
-
 Use `knowledge_*` for documents, specs, plans, references, and longer artifacts.
-
 Use `workflow_*` for phased work with artifacts, validation, gates, or promotion candidates.
 
 Saguaro redacts common secret shapes before memory or knowledge content is written locally or embedded. Redaction is config-driven and can be disabled or narrowed when a rule breaks legitimate content. Do not intentionally store secrets; redaction is a guardrail, not permission to preserve sensitive values.

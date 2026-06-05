@@ -26,6 +26,13 @@ Install Saguaro into all detected harnesses at user scope:
 The installer also links a user-level `saguaro` CLI into `~/.local/bin` by default. Then move into an existing project and initialize Saguaro:
 
 ```bash
+export EMBEDDINGS_BASE_URL="http://localhost:1234/v1"
+export EMBEDDINGS_MODEL="text-embedding-bge-m3"
+export EMBEDDINGS_API_KEY=""
+export LLM_BASE_URL="http://localhost:1234/v1"
+export LLM_MODEL="local-chat"
+export LLM_API_KEY=""
+
 saguaro init
 saguaro doctor
 saguaro smoke
@@ -56,6 +63,24 @@ You do not need to rewrite your skills. Add a Saguaro preflight and closeout:
 - When the work produces durable docs, plans, specs, or references, call `knowledge_ingest`.
 
 Migration guide: [docs/adopting-saguaro-in-existing-skills.md](./docs/adopting-saguaro-in-existing-skills.md).
+
+### I Want To Create A Custom Workflow
+
+Project-local workflows live in `.saguaro/workflows/*.yaml`. They can extend or shadow the bundled library without changing plugin files.
+
+Ask a Saguaro-enabled agent to guide the process:
+
+```text
+/create-workflow release-readiness
+```
+
+The `create-workflow` skill asks for the process goal, phases, required inputs and outputs, approval gates, and memory or knowledge requirements, then validates the YAML against the public schema when Saguaro workflow tools are available.
+
+See:
+
+- [docs/workflow-authoring.md](./docs/workflow-authoring.md)
+- [docs/workflow-yaml-schema.md](./docs/workflow-yaml-schema.md)
+- [docs/config-and-env.md](./docs/config-and-env.md)
 
 ### I Want To Develop Saguaro Itself
 
@@ -158,6 +183,7 @@ If there is even a 1% chance the answer already lives in specs, notes, or prior 
 Saguaro is project-local by design.
 
 - Config lives at `.saguaro/config.yaml`.
+- This file is Saguaro's project YAML surface; it is not named `project.yaml` in v1.
 - Secrets stay out of YAML.
 - MCP manifests pass secret names as environment variables.
 - Saguaro does not read user-home shell files or machine-local env files.
@@ -206,6 +232,7 @@ saguaro-agent/
 │   ├── saguaro-memory/
 │   └── saguaro-knowledge/
 ├── skills/
+│   ├── create-workflow/
 │   ├── using-saguaro/
 │   ├── workflow/
 │   └── saguaro/
@@ -216,6 +243,7 @@ saguaro-agent/
 
 | Skill | Purpose |
 | --- | --- |
+| [`create-workflow`](./skills/create-workflow/SKILL.md) | Guides users through drafting and validating a new project-local workflow YAML. |
 | [`using-saguaro`](./skills/using-saguaro/SKILL.md) | Teaches agents what Saguaro offers and when to use workflow, memory, and knowledge. |
 | [`workflow`](./skills/workflow/SKILL.md) | Runs a named Saguaro workflow through the workflow MCP. |
 | [`saguaro`](./skills/saguaro/SKILL.md) | Initializes project-local `.saguaro/` config and workflow directories. |
@@ -232,6 +260,8 @@ saguaro-agent/
 - [docs/plugin-installation.md](./docs/plugin-installation.md)
 - [docs/product-dx.md](./docs/product-dx.md)
 - [docs/semver-and-compatibility.md](./docs/semver-and-compatibility.md)
+- [docs/skills-and-agents.md](./docs/skills-and-agents.md)
+- [docs/workflow-authoring.md](./docs/workflow-authoring.md)
 - [docs/workflow-yaml-schema.md](./docs/workflow-yaml-schema.md)
 
 ## Contributing

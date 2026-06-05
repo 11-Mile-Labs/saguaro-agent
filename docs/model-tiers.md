@@ -15,17 +15,17 @@ A workflow chooses a logical tier. The project-local config decides what that me
 ```yaml
 model_tiers:
   claude:
-    standard: claude-sonnet-4-6
-    deep: claude-opus-4-7
-    surgeon: claude-opus-4-7-extended-thinking
+    standard: claude-standard-model
+    deep: claude-deep-model
+    surgeon: claude-high-reasoning-model
   codex:
-    standard: gpt-5-codex-medium
-    deep: gpt-5-codex-high
-    surgeon: gpt-5-codex-pro
+    standard: codex-standard-model
+    deep: codex-deep-model
+    surgeon: codex-high-reasoning-model
   gemini:
-    standard: gemini-2.5-flash
-    deep: gemini-2.5-pro
-    surgeon: gemini-2.5-pro-thinking
+    standard: gemini-standard-model
+    deep: gemini-deep-model
+    surgeon: gemini-high-reasoning-model
 ```
 
 ## Why The Indirection Helps
