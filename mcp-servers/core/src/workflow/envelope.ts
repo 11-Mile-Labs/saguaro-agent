@@ -1,10 +1,12 @@
 import type { HarnessName, ModelTier, SaguaroConfig } from "../config.js";
+import type { WorkflowSourceMetadata } from "./runtime.js";
 import { resolvePhaseDefaults, type WorkflowDefinition, type WorkflowPhase } from "./types.js";
 
 export interface WorkflowDispatchEnvelope {
   envelope_version: 1;
   run_id: string;
   workflow_name: string;
+  workflow_source?: WorkflowSourceMetadata;
   phase_id: string;
   phase_index: number;
   agent: string;
@@ -85,6 +87,7 @@ export function generateWorkflowEnvelope(args: {
   phase: WorkflowPhase;
   phaseIndex: number;
   artifactPath: string;
+  workflowSource?: WorkflowSourceMetadata;
   harness: HarnessName;
   config: SaguaroConfig;
 }): WorkflowDispatchEnvelope {
@@ -94,6 +97,7 @@ export function generateWorkflowEnvelope(args: {
     envelope_version: 1,
     run_id: args.runId,
     workflow_name: args.workflow.name,
+    ...(args.workflowSource ? { workflow_source: args.workflowSource } : {}),
     phase_id: args.phase.id,
     phase_index: args.phaseIndex,
     agent: args.phase.agent,

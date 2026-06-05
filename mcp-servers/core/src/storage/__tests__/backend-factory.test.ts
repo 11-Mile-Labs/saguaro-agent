@@ -1,5 +1,5 @@
 // mcp-servers/core/src/storage/__tests__/backend-factory.test.ts
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveStorageBackendName } from "../backend-factory.js";
 import type { StorageRuntime } from "../types.js";
 
@@ -18,9 +18,12 @@ function runtime(config: StorageRuntime["config"] = {}): StorageRuntime {
 
 const STORAGE_ENV = ["SAGUARO_STORAGE_BACKEND", "VECTOR_STORE_BASE_URL", "SAGUARO_VECTOR_STORE_BASE_URL"];
 
-afterEach(() => {
+function clearStorageEnv() {
   for (const key of STORAGE_ENV) delete process.env[key];
-});
+}
+
+beforeEach(clearStorageEnv);
+afterEach(clearStorageEnv);
 
 describe("resolveStorageBackendName", () => {
   it("defaults to filesystem when nothing is configured", () => {

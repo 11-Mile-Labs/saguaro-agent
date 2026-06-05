@@ -1,7 +1,7 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { clearToolRuntimeCaches } from "../../../core/src/storage/tool-runtime.js";
 import { setEmbeddingsClientFactoryForTests } from "../../../core/src/storage/embeddings-client.js";
 
@@ -24,7 +24,16 @@ function installFakeVectorBackends() {
   }));
 }
 
+const STORAGE_ENV = ["SAGUARO_STORAGE_BACKEND", "VECTOR_STORE_BASE_URL", "SAGUARO_VECTOR_STORE_BASE_URL"];
+
+function clearStorageEnv() {
+  for (const key of STORAGE_ENV) delete process.env[key];
+}
+
+beforeEach(clearStorageEnv);
+
 afterEach(() => {
+  clearStorageEnv();
   setEmbeddingsClientFactoryForTests(undefined);
   clearToolRuntimeCaches();
 });

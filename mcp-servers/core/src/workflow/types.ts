@@ -126,7 +126,7 @@ export interface WorkflowValidationResult {
 export interface WorkflowSourceEntry {
   name: string;
   description: string;
-  source: "project" | "bundled";
+  source: "project" | "bundled" | "path";
   path: string;
   workflow: WorkflowDefinition;
 }

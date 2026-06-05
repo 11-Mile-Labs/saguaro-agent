@@ -59,11 +59,25 @@ When `completed_at` is set (via dispatch finishing all phases or `workflow_compl
 
 | Tool | Role |
 | --- | --- |
-| `workflow_start` | Primary host entry point; accepts `resume` and optional `run_id`. |
+| `workflow_start` | Primary host entry point; accepts `resume`, optional `run_id`, and optional `workflow_path`. |
 | `workflow_find_run` | Lookup by `ticket_slug` (+ optional `workflow_name`); `include_completed` for status UIs. |
 | `workflow_resume` | Shorthand for `workflow_start` with `resume: true`. |
 
 Hosts should call `workflow_start` once in setup; no separate resume slash command is required.
+
+### Path-sourced workflows
+
+Hosts may pass `workflow_path` to start from a concrete YAML file instead of a
+workflow registered in `workflow_list`. Relative paths resolve under `project_path`;
+absolute paths are read directly subject to host filesystem policy. The requested
+`name` must match the YAML `name`, keeping run indexes and resume behavior
+unambiguous.
+
+Saguaro stores source metadata in `_status.json` and snapshots the validated
+workflow definition in `_workflow.json`. Resume uses that snapshot, so source-file
+changes do not drift an in-progress run. This allows hosts to generate per-run
+workflows with private or branded wording while Saguaro core remains neutral and
+does not own that vocabulary.
 
 ### Non-goals
 
