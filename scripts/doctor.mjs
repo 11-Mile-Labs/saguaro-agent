@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+import { loadGlobalEnv } from "../mcp-servers/core/dist/global-env.mjs";
+
+const globalEnv = loadGlobalEnv();
+if (globalEnv.loaded) {
+  console.log(`global env: ${globalEnv.filePath} (${globalEnv.applied.length} applied, ${globalEnv.skipped.length} already set)`);
+} else {
+  console.log("global env: no ~/.saguaro/env file found (optional; run install.sh to create a template)");
+}
+
 async function checkJson(label, url, options = {}) {
   try {
     const response = await fetch(url, options);
