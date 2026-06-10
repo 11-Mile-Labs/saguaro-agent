@@ -1,4 +1,5 @@
 export * from "./config.js";
+export * from "./global-env.js";
 export * from "./workflow/discovery.js";
 export * from "./workflow/dispatch-log.js";
 export * from "./workflow/envelope.js";
