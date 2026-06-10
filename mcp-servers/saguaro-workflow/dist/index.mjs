@@ -30357,11 +30357,6 @@ var StdioServerTransport = class {
   }
 };
 
-// src/server.ts
-import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { createRequire } from "node:module";
-import { resolve as resolve6 } from "node:path";
-
 // ../core/src/config.ts
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -30469,9 +30464,79 @@ function llmApiKeyEnv(config2) {
   return config2.llm?.api_key_env;
 }
 
+// ../core/src/global-env.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { join } from "node:path";
+var ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function parseEnvFile(raw) {
+  const result = {};
+  for (const rawLine of raw.split(/\r?\n/)) {
+    let line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    if (line.startsWith("export ")) {
+      line = line.slice("export ".length).trim();
+    }
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex < 1) {
+      continue;
+    }
+    const key = line.slice(0, equalsIndex).trim();
+    if (!ENV_KEY_PATTERN.test(key)) {
+      continue;
+    }
+    let value = line.slice(equalsIndex + 1).trim();
+    if (value.length >= 2 && (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+function resolveGlobalEnvPath(env = process.env) {
+  const explicit = env.SAGUARO_GLOBAL_ENV?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  const saguaroHome = env.SAGUARO_HOME?.trim();
+  if (saguaroHome) {
+    return join(saguaroHome, "env");
+  }
+  const home = env.HOME?.trim() || env.USERPROFILE?.trim();
+  if (!home) {
+    return void 0;
+  }
+  return join(home, ".saguaro", "env");
+}
+function loadGlobalEnv(options = {}) {
+  const env = options.env ?? process.env;
+  const filePath = options.filePath ?? resolveGlobalEnvPath(env);
+  if (!filePath || !existsSync2(filePath)) {
+    return { loaded: false, filePath, applied: [], skipped: [] };
+  }
+  let raw;
+  try {
+    raw = readFileSync2(filePath, "utf8");
+  } catch {
+    return { loaded: false, filePath, applied: [], skipped: [] };
+  }
+  const applied = [];
+  const skipped = [];
+  for (const [key, value] of Object.entries(parseEnvFile(raw))) {
+    if (env[key] !== void 0) {
+      skipped.push(key);
+      continue;
+    }
+    env[key] = value;
+    applied.push(key);
+  }
+  return { loaded: true, filePath, applied, skipped };
+}
+
 // ../core/src/workflow/discovery.ts
 var import_yaml2 = __toESM(require_dist(), 1);
-import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync3, readdirSync, readFileSync as readFileSync3 } from "node:fs";
 import { basename, extname, resolve as resolve2 } from "node:path";
 
 // ../core/src/workflow/types.ts
@@ -30759,11 +30824,11 @@ function getUpstreamPhaseIds(workflow, phaseId) {
 
 // ../core/src/workflow/discovery.ts
 function loadWorkflowAtPath(path, engineVersion) {
-  const raw = (0, import_yaml2.parse)(readFileSync2(path, "utf8"));
+  const raw = (0, import_yaml2.parse)(readFileSync3(path, "utf8"));
   return validateWorkflowDefinition(raw, { engineVersion });
 }
 function listYamlFiles(dirPath) {
-  if (!existsSync2(dirPath)) {
+  if (!existsSync3(dirPath)) {
     return [];
   }
   return readdirSync(dirPath).filter((entry) => extname(entry) === ".yaml").sort().map((entry) => resolve2(dirPath, entry));
@@ -30827,7 +30892,7 @@ function getWorkflowByName(workflows, workflowName) {
   return entry;
 }
 function validateWorkflowYamlFile(filePath, engineVersion = "1.0.0") {
-  if (!existsSync2(filePath)) {
+  if (!existsSync3(filePath)) {
     return {
       valid: false,
       workflow: null,
@@ -30860,7 +30925,7 @@ function validateWorkflowYamlFile(filePath, engineVersion = "1.0.0") {
 }
 
 // ../core/src/workflow/dispatch-log.ts
-import { appendFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3 } from "node:fs";
+import { appendFileSync, existsSync as existsSync4, mkdirSync, readFileSync as readFileSync4 } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve as resolve3 } from "node:path";
 var DispatchLogEntrySchema = external_exports.object({
@@ -30897,10 +30962,10 @@ function appendDispatchLogEntry(args) {
 }
 function readDispatchLogEntries(runDir, phaseId) {
   const logPath = getDispatchLogPath(runDir);
-  if (!existsSync3(logPath)) {
+  if (!existsSync4(logPath)) {
     return [];
   }
-  return readFileSync3(logPath, "utf8").split("\n").map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+  return readFileSync4(logPath, "utf8").split("\n").map((line) => line.trim()).filter(Boolean).flatMap((line) => {
     try {
       const parsed = DispatchLogEntrySchema.parse(JSON.parse(line));
       if (phaseId && parsed.phase_id !== phaseId) {
@@ -31052,7 +31117,7 @@ function renderRunQueueMarkdown(status, workflow) {
 }
 
 // ../core/src/workflow/run-index.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync } from "node:fs";
 import { resolve as resolve4 } from "node:path";
 function extractTicketSlug(workflowArgs) {
   const raw = workflowArgs.ticket_slug ?? workflowArgs.ticket;
@@ -31082,19 +31147,19 @@ function loadWorkflowRunFromIndex(config2, runId) {
   const statusPath = resolve4(runDir, "_status.json");
   const queuePath = resolve4(runDir, "_queue.md");
   const workflowPath = resolve4(runDir, "_workflow.json");
-  if (!existsSync4(statusPath) || !existsSync4(workflowPath)) {
+  if (!existsSync5(statusPath) || !existsSync5(workflowPath)) {
     throw new Error(`Run "${runId}" does not exist under ${runDir}.`);
   }
-  const status = JSON.parse(readFileSync4(statusPath, "utf8"));
-  const workflow = JSON.parse(readFileSync4(workflowPath, "utf8"));
+  const status = JSON.parse(readFileSync5(statusPath, "utf8"));
+  const workflow = JSON.parse(readFileSync5(workflowPath, "utf8"));
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
 }
 function readTicketIndexEntry(config2, workflowName, ticketSlug) {
   const indexPath = getTicketIndexPath(config2, workflowName, ticketSlug);
-  if (!existsSync4(indexPath)) {
+  if (!existsSync5(indexPath)) {
     return null;
   }
-  return JSON.parse(readFileSync4(indexPath, "utf8"));
+  return JSON.parse(readFileSync5(indexPath, "utf8"));
 }
 function writeTicketIndexEntry(config2, entry) {
   const indexDir = getTicketIndexDir(config2);
@@ -31172,7 +31237,7 @@ function syncTicketIndexFromRun(config2, run) {
 }
 
 // ../core/src/workflow/runtime.ts
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync2, existsSync as existsSync5 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync2, existsSync as existsSync6 } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname as dirname2, resolve as resolve5 } from "node:path";
 function createOpaqueRunId(workflowName) {
@@ -31203,7 +31268,7 @@ function writeRunFiles(loadedConfig, workflow, status) {
   writeJson(statusPath, status);
   writeFileSync2(queuePath, renderRunQueueMarkdown(status, workflow), "utf8");
   writeJson(workflowPath, workflow);
-  if (!existsSync5(dispatchPath)) {
+  if (!existsSync6(dispatchPath)) {
     writeFileSync2(dispatchPath, "", "utf8");
   }
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
@@ -31287,11 +31352,11 @@ function loadWorkflowRun(loadedConfig, runId) {
   const statusPath = resolve5(runDir, "_status.json");
   const queuePath = resolve5(runDir, "_queue.md");
   const workflowPath = resolve5(runDir, "_workflow.json");
-  if (!existsSync5(statusPath) || !existsSync5(workflowPath)) {
+  if (!existsSync6(statusPath) || !existsSync6(workflowPath)) {
     throw new Error(`Run "${runId}" does not exist under ${runDir}.`);
   }
-  const status = JSON.parse(readFileSync5(statusPath, "utf8"));
-  const workflow = JSON.parse(readFileSync5(workflowPath, "utf8"));
+  const status = JSON.parse(readFileSync6(statusPath, "utf8"));
+  const workflow = JSON.parse(readFileSync6(workflowPath, "utf8"));
   return { runDir, statusPath, queuePath, workflowPath, status, workflow };
 }
 function saveWorkflowRun(loadedConfig, run) {
@@ -31415,6 +31480,11 @@ function recordPhaseArtifact(workflow, status, args) {
   status.current_layer = getNextLayerIndex(workflow, status);
   return syncApprovalGates(status, workflow);
 }
+
+// src/server.ts
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { createRequire } from "node:module";
+import { resolve as resolve6 } from "node:path";
 
 // ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v3/helpers/util.js
 var util;
@@ -39968,6 +40038,10 @@ function createServer(options = {}) {
 
 // src/index.ts
 async function main() {
+  const globalEnv = loadGlobalEnv();
+  if (globalEnv.applied.length) {
+    console.error(`saguaro-workflow: loaded ${globalEnv.applied.length} env var(s) from ${globalEnv.filePath}`);
+  }
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

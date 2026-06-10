@@ -30357,6 +30357,76 @@ var StdioServerTransport = class {
   }
 };
 
+// ../core/src/global-env.ts
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+var ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function parseEnvFile(raw) {
+  const result = {};
+  for (const rawLine of raw.split(/\r?\n/)) {
+    let line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    if (line.startsWith("export ")) {
+      line = line.slice("export ".length).trim();
+    }
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex < 1) {
+      continue;
+    }
+    const key = line.slice(0, equalsIndex).trim();
+    if (!ENV_KEY_PATTERN.test(key)) {
+      continue;
+    }
+    let value = line.slice(equalsIndex + 1).trim();
+    if (value.length >= 2 && (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+function resolveGlobalEnvPath(env = process.env) {
+  const explicit = env.SAGUARO_GLOBAL_ENV?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  const saguaroHome = env.SAGUARO_HOME?.trim();
+  if (saguaroHome) {
+    return join(saguaroHome, "env");
+  }
+  const home = env.HOME?.trim() || env.USERPROFILE?.trim();
+  if (!home) {
+    return void 0;
+  }
+  return join(home, ".saguaro", "env");
+}
+function loadGlobalEnv(options = {}) {
+  const env = options.env ?? process.env;
+  const filePath = options.filePath ?? resolveGlobalEnvPath(env);
+  if (!filePath || !existsSync(filePath)) {
+    return { loaded: false, filePath, applied: [], skipped: [] };
+  }
+  let raw;
+  try {
+    raw = readFileSync(filePath, "utf8");
+  } catch {
+    return { loaded: false, filePath, applied: [], skipped: [] };
+  }
+  const applied = [];
+  const skipped = [];
+  for (const [key, value] of Object.entries(parseEnvFile(raw))) {
+    if (env[key] !== void 0) {
+      skipped.push(key);
+      continue;
+    }
+    env[key] = value;
+    applied.push(key);
+  }
+  return { loaded: true, filePath, applied, skipped };
+}
+
 // src/server.ts
 import { createRequire } from "node:module";
 
@@ -38289,7 +38359,7 @@ var EMPTY_COMPLETION_RESULT = {
 // ../core/src/storage/dispatch-log.ts
 import { appendFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join as join2 } from "node:path";
 
 // ../core/src/storage/filesystem.ts
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -38331,8 +38401,8 @@ async function appendDispatchLog(paths, context, options) {
   if (!context.run_id || !context.phase_id) {
     return;
   }
-  const logDir = join(paths.runsDir, context.run_id);
-  const logPath = join(logDir, "_dispatch.jsonl");
+  const logDir = join2(paths.runsDir, context.run_id);
+  const logPath = join2(logDir, "_dispatch.jsonl");
   await ensureDir(logDir);
   const payload = {
     ts: (/* @__PURE__ */ new Date()).toISOString(),
@@ -38372,11 +38442,11 @@ function collectionKey(namespace, scope, projectId) {
 }
 
 // ../core/src/storage/config.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
-import { basename, isAbsolute, join as join2, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync3, readFileSync as readFileSync3 } from "node:fs";
+import { basename, isAbsolute, join as join3, resolve as resolve2 } from "node:path";
 
 // ../core/src/config.ts
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
 import { dirname as dirname2, resolve } from "node:path";
 var import_yaml = __toESM(require_dist2(), 1);
 var HarnessSchema = external_exports.enum(["claude", "codex", "gemini", "unknown"]);
@@ -38432,7 +38502,7 @@ var SaguaroConfigSchema = external_exports.object({
 function findProjectRoot(startPath = process.cwd()) {
   let current = resolve(startPath);
   while (true) {
-    if (existsSync(resolve(current, ".saguaro", "config.yaml"))) {
+    if (existsSync2(resolve(current, ".saguaro", "config.yaml"))) {
       return current;
     }
     const parent = dirname2(current);
@@ -38451,7 +38521,7 @@ function resolveProjectPath(projectRoot, rawPath) {
 }
 function resolveConfigPath(projectRoot, configPath) {
   if (!configPath) {
-    return join2(projectRoot, ".saguaro", "config.yaml");
+    return join3(projectRoot, ".saguaro", "config.yaml");
   }
   return isAbsolute(configPath) ? configPath : resolve2(projectRoot, configPath);
 }
@@ -38507,10 +38577,10 @@ function parseSimpleYaml(raw) {
   return root;
 }
 function loadConfig(configPath) {
-  if (!existsSync2(configPath)) {
+  if (!existsSync3(configPath)) {
     return {};
   }
-  const raw = readFileSync2(configPath, "utf8");
+  const raw = readFileSync3(configPath, "utf8");
   const parsed = parseSimpleYaml(raw);
   if (!parsed) {
     return {};
@@ -38677,7 +38747,7 @@ var ChromaDbBackend = class {
 };
 
 // ../core/src/storage/backends/filesystem-backend.ts
-import { dirname as dirname3, join as join3 } from "node:path";
+import { dirname as dirname3, join as join4 } from "node:path";
 
 // ../core/src/storage/vector-score.ts
 function cosineScore(left, right) {
@@ -38713,10 +38783,10 @@ var FilesystemBackend = class {
   filePath(key) {
     const namespaceDir = key.namespace === "memory" ? this.paths.memoryDir : this.paths.knowledgeDir;
     if (!key.projectId) {
-      return join3(namespaceDir, `${key.scope}.json`);
+      return join4(namespaceDir, `${key.scope}.json`);
     }
     const dataDir = dirname3(namespaceDir);
-    return join3(dataDir, "projects", assertProjectId(key.projectId), key.namespace, `${key.scope}.json`);
+    return join4(dataDir, "projects", assertProjectId(key.projectId), key.namespace, `${key.scope}.json`);
   }
   async read(key) {
     return readJsonFile(this.filePath(key), []);
@@ -39396,6 +39466,10 @@ function createServer() {
 
 // src/index.ts
 async function main() {
+  const globalEnv = loadGlobalEnv();
+  if (globalEnv.applied.length) {
+    console.error(`saguaro-memory: loaded ${globalEnv.applied.length} env var(s) from ${globalEnv.filePath}`);
+  }
   const server = createServer();
   await server.connect(new StdioServerTransport());
   console.error("saguaro-memory MCP server running on stdio");

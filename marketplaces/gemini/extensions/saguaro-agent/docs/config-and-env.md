@@ -332,18 +332,50 @@ Every provider key also accepts a `SAGUARO_`-prefixed override form.
 | ChromaDB URL | `VECTOR_STORE_BASE_URL` | `SAGUARO_VECTOR_STORE_BASE_URL` |
 | ChromaDB API key | `VECTOR_STORE_API_KEY` | `SAGUARO_VECTOR_STORE_API_KEY` |
 
+## Global Env File (`~/.saguaro/env`)
+
+Desktop harnesses (Claude Desktop, Codex app, Cursor, and similar) launch MCP servers without a login shell, so variables exported from `~/.zshrc`, `~/.localrc`, or other profile scripts never reach the server process. The global env file closes that gap.
+
+At startup, each Saguaro MCP server loads a machine-wide dotenv file:
+
+```text
+~/.saguaro/env
+```
+
+Format is standard dotenv: `KEY=VALUE` pairs, `#` comments, blank lines, an optional `export ` prefix, and optional single or double quotes around values.
+
+```bash
+# ~/.saguaro/env
+EMBEDDINGS_API_KEY=sk-...
+LLM_API_KEY=sk-...
+VECTOR_STORE_BASE_URL=http://localhost:8000
+```
+
+Precedence rules:
+
+1. Variables already present in the process environment always win — even when set to an empty string. Terminal launches behave exactly as before.
+2. File values fill in only what is missing.
+3. A missing file is a silent no-op.
+
+Path resolution order:
+
+1. `SAGUARO_GLOBAL_ENV` — exact file path override
+2. `$SAGUARO_HOME/env` when `SAGUARO_HOME` is set
+3. `~/.saguaro/env`
+
+The file is machine-local. Never commit it, and never place secrets in project config or harness MCP JSON when this file can hold them instead.
+
 ## What Saguaro Will Not Read
 
-Saguaro reads project-local `.saguaro/config.yaml` and process environment variables passed by the host MCP configuration.
+Saguaro reads project-local `.saguaro/config.yaml`, process environment variables passed by the host MCP configuration, and the global env file described above.
 
 It should not read:
 
 - shell startup files
-- user-home env files
 - machine-local profile scripts
 - private project config outside the target project
 
-If the host does not pass a required environment variable, the relevant tool should fail with a clear configuration error.
+If a required environment variable is absent from the process environment and the global env file, the relevant tool should fail with a clear configuration error.
 
 ## Per-Call Project Isolation
 

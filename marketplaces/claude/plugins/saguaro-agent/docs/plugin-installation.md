@@ -46,6 +46,8 @@ Preview without installing:
 
 The installer also links the `saguaro` CLI into `~/.local/bin` by default. Use `--no-cli` to skip that step or `--cli-dir <dir>` to choose a different user bin directory.
 
+The installer also creates `~/.saguaro/env` with placeholder values when the file does not already exist (an existing file is never touched). Fill in your embeddings and LLM credentials there so desktop harnesses that launch MCP servers without a login shell still get them. See the Global Env File section in [config-and-env.md](./config-and-env.md).
+
 Install one harness:
 
 ```bash

@@ -3,6 +3,7 @@ import { build } from "esbuild";
 const entries = [
   "src/index.ts",
   "src/config.ts",
+  "src/global-env.ts",
   "src/workflow/discovery.ts",
   "src/workflow/dispatch-log.ts",
   "src/workflow/envelope.ts",

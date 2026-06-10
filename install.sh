@@ -60,8 +60,57 @@ legacy_codex_marketplace_installed() {
   [[ -f "${CODEX_HOME:-$HOME/.codex}/config.toml" ]] && grep -q '^\[marketplaces\.saguaro-agent\]' "${CODEX_HOME:-$HOME/.codex}/config.toml"
 }
 
+ensure_global_env() {
+  local saguaro_home="${SAGUARO_HOME:-$HOME/.saguaro}"
+  local env_file="${SAGUARO_GLOBAL_ENV:-$saguaro_home/env}"
+
+  if [[ -f "$env_file" ]]; then
+    echo "global env: $env_file already exists; leaving it untouched."
+    return 0
+  fi
+
+  echo "+ create $env_file (template)"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$env_file")"
+  cat > "$env_file" <<'TEMPLATE'
+# Saguaro machine-wide environment (~/.saguaro/env)
+#
+# Loaded by the Saguaro MCP servers at startup so desktop harnesses
+# (Claude Desktop, Codex app, Cursor, ...) that launch without a login
+# shell still get provider credentials. Variables already present in the
+# process environment always win; this file only fills in what's missing.
+#
+# Fill in the values below, then restart your harness. Keep this file
+# private (chmod 600) and never commit it anywhere.
+
+# --- Embeddings (OpenAI-compatible) — required for memory & knowledge ---
+EMBEDDINGS_BASE_URL=http://localhost:11434/v1
+EMBEDDINGS_MODEL=nomic-embed-text
+EMBEDDINGS_API_KEY=
+
+# --- Chat LLM (OpenAI-compatible) — used by knowledge_query synthesis ---
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=
+LLM_API_KEY=
+
+# --- Storage (optional) — uncomment for ChromaDB instead of filesystem ---
+# SAGUARO_STORAGE_BACKEND=chromadb
+# VECTOR_STORE_BASE_URL=http://localhost:8000
+# VECTOR_STORE_API_KEY=
+TEMPLATE
+  chmod 600 "$env_file"
+  echo "note: created $env_file with placeholder values."
+  echo "      Edit it to add your embeddings/LLM credentials, then restart your harness."
+  echo "      Docs: docs/config-and-env.md (Global Env File section)."
+}
+
 run pnpm --dir "$ROOT" build
 run pnpm --dir "$ROOT" plugin:validate
+
+ensure_global_env
 
 if [[ "$INSTALL_CLI" -eq 1 ]]; then
   run mkdir -p "$CLI_DIR"
