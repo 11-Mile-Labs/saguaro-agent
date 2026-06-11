@@ -30361,6 +30361,7 @@ var StdioServerTransport = class {
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 var ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+var PLACEHOLDER_PATTERN = /^\$\{[A-Za-z0-9_]+\}$/;
 function parseEnvFile(raw) {
   const result = {};
   for (const rawLine of raw.split(/\r?\n/)) {
@@ -30417,7 +30418,8 @@ function loadGlobalEnv(options = {}) {
   const applied = [];
   const skipped = [];
   for (const [key, value] of Object.entries(parseEnvFile(raw))) {
-    if (env[key] !== void 0) {
+    const current = env[key];
+    if (current !== void 0 && !PLACEHOLDER_PATTERN.test(current)) {
       skipped.push(key);
       continue;
     }

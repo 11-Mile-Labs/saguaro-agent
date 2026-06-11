@@ -7,9 +7,19 @@ import { join } from "node:path";
  * Values from ~/.saguaro/env are applied with LOWEST precedence: a variable
  * already present in the process env — even as an empty string — is never
  * overridden, so terminal launches behave exactly as before.
+ *
+ * Exception: a value that looks like an unexpanded harness placeholder
+ * (matching /^\$\{[A-Za-z0-9_]+\}$/, e.g. "${MY_VAR}") is treated as
+ * missing. Desktop harnesses that inject literal placeholder strings into
+ * the process env when the underlying secret was not resolved would otherwise
+ * permanently block the ~/.saguaro/env fallback. Real values — including
+ * empty strings — still win.
  */
 
 const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** Matches an unexpanded harness placeholder such as `${SOME_VAR}`. */
+const PLACEHOLDER_PATTERN = /^\$\{[A-Za-z0-9_]+\}$/;
 
 export interface LoadGlobalEnvOptions {
   env?: NodeJS.ProcessEnv;
@@ -98,7 +108,8 @@ export function loadGlobalEnv(options: LoadGlobalEnvOptions = {}): LoadGlobalEnv
   const skipped: string[] = [];
 
   for (const [key, value] of Object.entries(parseEnvFile(raw))) {
-    if (env[key] !== undefined) {
+    const current = env[key];
+    if (current !== undefined && !PLACEHOLDER_PATTERN.test(current)) {
       skipped.push(key);
       continue;
     }

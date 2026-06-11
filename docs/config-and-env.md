@@ -354,8 +354,9 @@ VECTOR_STORE_BASE_URL=http://localhost:8000
 Precedence rules:
 
 1. Variables already present in the process environment always win — even when set to an empty string. Terminal launches behave exactly as before.
-2. File values fill in only what is missing.
-3. A missing file is a silent no-op.
+2. **Exception — unexpanded harness placeholders**: a value matching the pattern `${VAR_NAME}` (a bare `${}` expression with no surrounding content) is treated as missing, so the file value overwrites it. Desktop harnesses that inject literal placeholder strings when the underlying secret was not resolved are handled correctly. Real values — including empty strings — are never replaced.
+3. File values fill in only what is missing.
+4. A missing file is a silent no-op.
 
 Path resolution order:
 

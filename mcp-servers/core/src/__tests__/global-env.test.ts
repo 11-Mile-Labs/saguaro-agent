@@ -105,6 +105,38 @@ describe("loadGlobalEnv", () => {
     expect(env.FLAG).toBe("");
   });
 
+  it("overwrites an unexpanded harness placeholder with the file value", () => {
+    writeEnvFile("API_KEY=real-secret\n");
+    const env: NodeJS.ProcessEnv = { HOME: tempDir, API_KEY: "${API_KEY}" };
+
+    const result = loadGlobalEnv({ env });
+
+    expect(env.API_KEY).toBe("real-secret");
+    expect(result.applied).toContain("API_KEY");
+    expect(result.skipped).not.toContain("API_KEY");
+  });
+
+  it("leaves a placeholder as-is when no file entry exists for it", () => {
+    writeEnvFile("OTHER=value\n");
+    const env: NodeJS.ProcessEnv = { HOME: tempDir, MISSING_KEY: "${MISSING_KEY}" };
+
+    loadGlobalEnv({ env });
+
+    // No file entry → variable stays at the placeholder value unchanged
+    expect(env.MISSING_KEY).toBe("${MISSING_KEY}");
+  });
+
+  it("does not overwrite a real non-empty value that happens to contain braces", () => {
+    // A value like "${something}" WITH surrounding content is NOT a bare placeholder
+    writeEnvFile("TEMPLATE=from-file\n");
+    const env: NodeJS.ProcessEnv = { HOME: tempDir, TEMPLATE: "prefix-${something}-suffix" };
+
+    const result = loadGlobalEnv({ env });
+
+    expect(env.TEMPLATE).toBe("prefix-${something}-suffix");
+    expect(result.skipped).toContain("TEMPLATE");
+  });
+
   it("is a no-op when the file does not exist", () => {
     tempDir = mkdtempSync(join(tmpdir(), "saguaro-global-env-"));
     const env: NodeJS.ProcessEnv = { HOME: tempDir };
