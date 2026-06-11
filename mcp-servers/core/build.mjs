@@ -1,5 +1,15 @@
 import { build } from "esbuild";
 
+// CJS dependencies (e.g. yaml) call require("process") etc.; in ESM output
+// esbuild turns those into a dynamic-require stub that throws at load time.
+// Restore a working require for node builtins, same as the server bundles.
+const banner = {
+  js: [
+    'import { createRequire as __cjsCreateRequire } from "module";',
+    "const require = __cjsCreateRequire(import.meta.url);",
+  ].join("\n"),
+};
+
 const entries = [
   "src/index.ts",
   "src/config.ts",
@@ -37,6 +47,7 @@ for (const entry of entries) {
     target: "node22",
     format: "esm",
     outfile,
+    banner,
     sourcemap: true,
     minify: false,
   });

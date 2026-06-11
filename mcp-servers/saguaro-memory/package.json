@@ -1,6 +1,6 @@
 {
   "name": "@11-mile-labs/saguaro-memory",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Saguaro memory MCP server.",
   "type": "module",
   "main": "dist/index.mjs",

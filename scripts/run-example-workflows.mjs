@@ -183,6 +183,15 @@ async function runWorkflow(exampleName, sourceDir, workflowName, fakeBaseUrl) {
     CODEX_HOME: "/tmp/codex-smoke",
     EMBEDDINGS_API_KEY: "smoke-embeddings",
     LLM_API_KEY: "smoke-llm",
+    // Examples run in throwaway temp projects; force the filesystem backend
+    // so spawned servers can never write to a real vector store. The explicit
+    // selector beats both VECTOR_STORE_BASE_URL inference and the
+    // ~/.saguaro/env fallback the server entrypoints load.
+    SAGUARO_STORAGE_BACKEND: "filesystem",
+    VECTOR_STORE_BASE_URL: "",
+    SAGUARO_VECTOR_STORE_BASE_URL: "",
+    VECTOR_STORE_API_KEY: "",
+    SAGUARO_VECTOR_STORE_API_KEY: "",
   };
   const workflow = await connect(process.execPath, [resolve(repoRoot, "mcp-servers/saguaro-workflow/dist/index.mjs")], projectRoot, env);
   const memory = await connect(process.execPath, [resolve(repoRoot, "mcp-servers/saguaro-memory/dist/index.mjs")], projectRoot, env);

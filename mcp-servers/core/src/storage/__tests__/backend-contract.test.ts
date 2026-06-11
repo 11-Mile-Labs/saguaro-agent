@@ -2,7 +2,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import type { CollectionKey, StorageBackend, StoredRecord } from "../backend.js";
 import { ChromaDbBackend } from "../backends/chromadb-backend.js";
 import { FilesystemBackend } from "../backends/filesystem-backend.js";
@@ -74,16 +74,43 @@ runBackendContract("filesystem", async () => {
   });
 });
 
-const chromaUrl = process.env.VECTOR_STORE_BASE_URL ?? process.env.SAGUARO_VECTOR_STORE_BASE_URL;
+// Integration leg: opt-in ONLY via the test-dedicated variable. The shared
+// vitest setup strips VECTOR_STORE_BASE_URL so a production server inherited
+// from the shell can never be reached; point this at a disposable instance,
+// e.g. `docker run --rm -p 8001:8000 chromadb/chroma` then
+// SAGUARO_TEST_VECTOR_STORE_BASE_URL=http://localhost:8001 pnpm test.
+const chromaUrl = process.env.SAGUARO_TEST_VECTOR_STORE_BASE_URL;
 
-// Guarded: only runs when a ChromaDB server is configured.
-(chromaUrl ? runBackendContract : (() => {}))("chromadb", async () => {
-  // Unique prefixes per run keep repeated test runs from colliding in shared collections.
-  const stamp = `it${Date.now()}${Math.floor(Math.random() * 1e6)}`;
-  return new ChromaDbBackend({
-    baseUrl: chromaUrl as string,
-    apiKey: process.env.VECTOR_STORE_API_KEY ?? process.env.SAGUARO_VECTOR_STORE_API_KEY,
-    memoryCollection: `${stamp}_memory`,
-    knowledgeCollection: `${stamp}_knowledge`,
+if (chromaUrl) {
+  const apiKey = process.env.SAGUARO_TEST_VECTOR_STORE_API_KEY;
+  const apiRoot = `${chromaUrl.replace(/\/+$/, "")}/api/v2/tenants/default_tenant/databases/default_database`;
+  const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const stamps: string[] = [];
+
+  // Teardown: delete every collection this run created so repeated runs do
+  // not accumulate junk collections on the test server.
+  afterAll(async () => {
+    const response = await fetch(`${apiRoot}/collections?limit=1000`, { headers });
+    if (!response.ok) return;
+    const collections = (await response.json()) as Array<{ name: string }>;
+    await Promise.all(
+      collections
+        .filter((collection) => stamps.some((stamp) => collection.name.startsWith(stamp)))
+        .map((collection) =>
+          fetch(`${apiRoot}/collections/${collection.name}`, { method: "DELETE", headers }),
+        ),
+    );
   });
-});
+
+  runBackendContract("chromadb", async () => {
+    // Unique prefixes per test keep repeated runs from colliding in shared collections.
+    const stamp = `it${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+    stamps.push(stamp);
+    return new ChromaDbBackend({
+      baseUrl: chromaUrl,
+      apiKey,
+      memoryCollection: `${stamp}_memory`,
+      knowledgeCollection: `${stamp}_knowledge`,
+    });
+  });
+}

@@ -83,6 +83,77 @@ describe("ChromaDbBackend", () => {
     expect(results[1]?.score).toBeCloseTo(0.1, 5);
   });
 
+  it("re-resolves the collection by name and retries once when a cached id 404s", async () => {
+    // Simulates the collection being deleted and recreated externally while
+    // the backend still holds the stale UUID from first resolution.
+    let resolves = 0;
+    const upsertAttempts: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/collections")) {
+          resolves += 1;
+          return jsonResponse({ id: `col-${resolves}`, name: "x" });
+        }
+        if (url.endsWith("/upsert")) {
+          const collectionId = url.match(/collections\/([^/]+)\/upsert/)?.[1] ?? "";
+          upsertAttempts.push(collectionId);
+          return collectionId === "col-1"
+            ? new Response("collection not found", { status: 404 })
+            : jsonResponse({});
+        }
+        throw new Error(`unexpected url ${url}`);
+      }),
+    );
+
+    const backend = makeBackend();
+    await backend.upsert(KEY, [
+      { id: "a", vector: [1, 0], document: "hello", metadata: { scope: "project" } },
+    ]);
+
+    expect(upsertAttempts).toEqual(["col-1", "col-2"]);
+    expect(resolves).toBe(2);
+  });
+
+  it("propagates a 404 that persists after one re-resolution", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/collections")) return jsonResponse({ id: "col-1", name: "x" });
+        if (url.endsWith("/upsert")) return new Response("collection not found", { status: 404 });
+        throw new Error(`unexpected url ${url}`);
+      }),
+    );
+
+    await expect(
+      makeBackend().upsert(KEY, [
+        { id: "a", vector: [1, 0], document: "hello", metadata: { scope: "project" } },
+      ]),
+    ).rejects.toThrow(/request failed \(404/);
+  });
+
+  it("does not retry non-404 data-op failures", async () => {
+    let upserts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/collections")) return jsonResponse({ id: "col-1", name: "x" });
+        if (url.endsWith("/upsert")) {
+          upserts += 1;
+          return new Response("boom", { status: 500 });
+        }
+        throw new Error(`unexpected url ${url}`);
+      }),
+    );
+
+    await expect(
+      makeBackend().upsert(KEY, [
+        { id: "a", vector: [1, 0], document: "hello", metadata: { scope: "project" } },
+      ]),
+    ).rejects.toThrow(/request failed \(500/);
+    expect(upserts).toBe(1);
+  });
+
   it("wraps connection failures in a clear no-fallback error", async () => {
     vi.stubGlobal(
       "fetch",

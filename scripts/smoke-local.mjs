@@ -3,8 +3,22 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStorageRuntime } from "../mcp-servers/core/dist/storage/config.mjs";
+import { resolveStorageBackend } from "../mcp-servers/core/dist/storage/backend-factory.mjs";
 import { MemoryStorage } from "../mcp-servers/core/dist/storage/memory-store.mjs";
 import { KnowledgeStorage } from "../mcp-servers/core/dist/storage/knowledge-store.mjs";
+
+// The smoke exercises the throwaway temp project below and must never write
+// to a real vector store inherited from the shell. Strip the inherited
+// configuration and pin the filesystem backend in the generated config.
+for (const key of [
+  "SAGUARO_STORAGE_BACKEND",
+  "VECTOR_STORE_BASE_URL",
+  "SAGUARO_VECTOR_STORE_BASE_URL",
+  "VECTOR_STORE_API_KEY",
+  "SAGUARO_VECTOR_STORE_API_KEY",
+]) {
+  delete process.env[key];
+}
 
 const projectRoot = await mkdtemp(join(tmpdir(), "saguaro-smoke-"));
 const collectionSuffix = Date.now().toString(36);
@@ -19,6 +33,8 @@ llm:
   base_url: "${process.env.SAGUARO_LLM_BASE_URL ?? process.env.LLM_BASE_URL ?? "http://localhost:1234/v1"}"
   model: "${process.env.SAGUARO_LLM_MODEL ?? process.env.LLM_MODEL ?? "local-chat"}"
   api_key_env: LLM_API_KEY
+storage:
+  backend: filesystem
 memory:
   collection: "saguaro_smoke_memory_${collectionSuffix}"
 knowledge:
@@ -27,8 +43,9 @@ knowledge:
 `, "utf8");
 
   const runtime = createStorageRuntime({ projectRoot });
-  const memory = new MemoryStorage(runtime);
-  const knowledge = new KnowledgeStorage(runtime);
+  const backend = resolveStorageBackend(runtime);
+  const memory = new MemoryStorage(runtime, backend);
+  const knowledge = new KnowledgeStorage(runtime, backend);
 
   const storedMemory = await memory.store({
     content: `Saguaro smoke memory: retry semantic retrieval before assuming context is absent. api_key=${"sk-"}smoketest1234567890`,

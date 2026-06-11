@@ -21,6 +21,15 @@ interface ChromaCollection {
   name: string;
 }
 
+class ChromaRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 interface ChromaGetResult {
   ids: string[];
   documents: (string | null)[];
@@ -73,9 +82,10 @@ export class ChromaDbBackend implements StorageBackend {
       );
     }
     if (!response.ok) {
-      throw new Error(
+      throw new ChromaRequestError(
         `Saguaro storage backend "chromadb" request failed ` +
           `(${response.status} ${method} ${url}): ${await response.text()}`,
+        response.status,
       );
     }
     if (response.status === 204) return undefined;
@@ -107,6 +117,26 @@ export class ChromaDbBackend implements StorageBackend {
     return created.id;
   }
 
+  /**
+   * Data ops key on the cached collection UUID. If the collection is deleted
+   * and recreated externally, the cached id 404s for the rest of the process
+   * lifetime — so on 404, drop the cache, get-or-create by name once, and
+   * retry the operation against the fresh id.
+   */
+  private async withCollection<T>(
+    key: CollectionKey,
+    op: (collectionId: string) => Promise<T>,
+  ): Promise<T> {
+    const id = await this.collectionId(key);
+    try {
+      return await op(id);
+    } catch (error) {
+      if (!(error instanceof ChromaRequestError) || error.status !== 404) throw error;
+      this.collectionIds.delete(collectionName(this.baseFor(key.namespace), key));
+      return op(await this.collectionId(key));
+    }
+  }
+
   private toStored(result: ChromaGetResult): StoredRecord[] {
     return result.ids.map((id, index) => ({
       id,
@@ -118,22 +148,24 @@ export class ChromaDbBackend implements StorageBackend {
 
   async upsert(key: CollectionKey, records: StoredRecord[]): Promise<void> {
     if (records.length === 0) return;
-    const id = await this.collectionId(key);
-    await this.request("POST", `${this.root}/collections/${id}/upsert`, {
-      ids: records.map((record) => record.id),
-      embeddings: records.map((record) => record.vector),
-      documents: records.map((record) => record.document),
-      metadatas: records.map((record) => record.metadata),
-    });
+    await this.withCollection(key, (id) =>
+      this.request("POST", `${this.root}/collections/${id}/upsert`, {
+        ids: records.map((record) => record.id),
+        embeddings: records.map((record) => record.vector),
+        documents: records.map((record) => record.document),
+        metadatas: records.map((record) => record.metadata),
+      }),
+    );
   }
 
   async query(key: CollectionKey, vector: number[], limit: number): Promise<ScoredRecord[]> {
-    const id = await this.collectionId(key);
-    const result = (await this.request("POST", `${this.root}/collections/${id}/query`, {
-      query_embeddings: [vector],
-      n_results: Math.max(1, limit),
-      include: ["documents", "metadatas", "embeddings", "distances"],
-    })) as ChromaQueryResult;
+    const result = (await this.withCollection(key, (id) =>
+      this.request("POST", `${this.root}/collections/${id}/query`, {
+        query_embeddings: [vector],
+        n_results: Math.max(1, limit),
+        include: ["documents", "metadatas", "embeddings", "distances"],
+      }),
+    )) as ChromaQueryResult;
 
     const ids = result.ids[0] ?? [];
     return ids.map((recordId, index) => ({
@@ -147,24 +179,27 @@ export class ChromaDbBackend implements StorageBackend {
   }
 
   async get(key: CollectionKey, recordId: string): Promise<StoredRecord | undefined> {
-    const id = await this.collectionId(key);
-    const result = (await this.request("POST", `${this.root}/collections/${id}/get`, {
-      ids: [recordId],
-      include: ["documents", "metadatas", "embeddings"],
-    })) as ChromaGetResult;
+    const result = (await this.withCollection(key, (id) =>
+      this.request("POST", `${this.root}/collections/${id}/get`, {
+        ids: [recordId],
+        include: ["documents", "metadatas", "embeddings"],
+      }),
+    )) as ChromaGetResult;
     return this.toStored(result)[0];
   }
 
   async list(key: CollectionKey): Promise<StoredRecord[]> {
-    const id = await this.collectionId(key);
-    const result = (await this.request("POST", `${this.root}/collections/${id}/get`, {
-      include: ["documents", "metadatas", "embeddings"],
-    })) as ChromaGetResult;
+    const result = (await this.withCollection(key, (id) =>
+      this.request("POST", `${this.root}/collections/${id}/get`, {
+        include: ["documents", "metadatas", "embeddings"],
+      }),
+    )) as ChromaGetResult;
     return this.toStored(result);
   }
 
   async delete(key: CollectionKey, recordId: string): Promise<void> {
-    const id = await this.collectionId(key);
-    await this.request("POST", `${this.root}/collections/${id}/delete`, { ids: [recordId] });
+    await this.withCollection(key, (id) =>
+      this.request("POST", `${this.root}/collections/${id}/delete`, { ids: [recordId] }),
+    );
   }
 }
