@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "saguaro-workflow": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-workflow/dist/index.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "SAGUARO_BUNDLED_WORKFLOWS_DIR": "workflows"
+      }
+    },
+    "saguaro-memory": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-memory/dist/index.mjs"
+      ],
+      "cwd": ".",
+      "env": {}
+    },
+    "saguaro-knowledge": {
+      "command": "node",
+      "args": [
+        "mcp-servers/saguaro-knowledge/dist/index.mjs"
+      ],
+      "cwd": ".",
+      "env": {}
+    }
+  }
+}

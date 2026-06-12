@@ -6,6 +6,8 @@ const repoRoot = resolve(new URL("..", import.meta.url).pathname);
 const required = [
   "marketplaces/claude/.claude-plugin/marketplace.json",
   "marketplaces/claude/plugins/saguaro-agent/.claude-plugin/plugin.json",
+  "marketplaces/claude/plugins/saguaro-agent/.cursor-plugin/plugin.json",
+  "marketplaces/claude/plugins/saguaro-agent/mcp.json",
   "marketplaces/claude/plugins/saguaro-agent/mcp-servers/saguaro-workflow/dist/index.mjs",
   "marketplaces/claude/plugins/saguaro-agent/mcp-servers/saguaro-memory/dist/index.mjs",
   "marketplaces/claude/plugins/saguaro-agent/mcp-servers/saguaro-knowledge/dist/index.mjs",
@@ -173,6 +175,37 @@ for (const [name, entry] of Object.entries(codexMcp.mcpServers)) {
     }
   }
   assertSameStringSet(name, entry.env_vars, expected.env_vars, "env_vars");
+}
+
+const cursorPlugin = await readJson("marketplaces/claude/plugins/saguaro-agent/.cursor-plugin/plugin.json");
+if (cursorPlugin.mcpServers !== "./mcp.json") {
+  throw new Error("Cursor plugin must reference the plugin-local mcp.json.");
+}
+
+const cursorMcpPath = "marketplaces/claude/plugins/saguaro-agent/mcp.json";
+const cursorMcpRaw = await readFile(resolve(repoRoot, cursorMcpPath), "utf8");
+assertNoForbiddenCodexManifestContent(cursorMcpRaw);
+
+const cursorMcp = JSON.parse(cursorMcpRaw);
+assertSameStringSet("Cursor MCP manifest", Object.keys(cursorMcp.mcpServers ?? {}), Object.keys(codexExpected), "servers");
+
+for (const [name, entry] of Object.entries(cursorMcp.mcpServers)) {
+  const expected = codexExpected[name];
+
+  if (entry.command !== "node") {
+    throw new Error(`Cursor ${name} must launch node directly, not a shell wrapper.`);
+  }
+  assertSameStringSet(`Cursor ${name}`, entry.args, expected.args, "args");
+  if (entry.cwd !== ".") {
+    throw new Error(`Cursor ${name} must run with cwd "." so relative MCP paths resolve at the plugin root.`);
+  }
+  assertNoPlaceholderEnvValues(`Cursor ${name}`, entry.env);
+  assertSameStringSet(`Cursor ${name}`, Object.keys(entry.env), Object.keys(expected.env), "env names");
+  for (const [envName, envValue] of Object.entries(expected.env)) {
+    if (entry.env[envName] !== envValue) {
+      throw new Error(`Cursor ${name} env.${envName} must be ${envValue}.`);
+    }
+  }
 }
 
 console.log("Marketplace artifact validation passed.");

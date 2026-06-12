@@ -78,6 +78,20 @@ function codexMcpServers() {
   );
 }
 
+function cursorMcpServers() {
+  return Object.fromEntries(
+    Object.entries(servers).map(([name, server]) => [
+      name,
+      {
+        command: "node",
+        args: [server.path],
+        cwd: ".",
+        env: server.needsBundledWorkflows ? { SAGUARO_BUNDLED_WORKFLOWS_DIR: "workflows" } : {},
+      },
+    ])
+  );
+}
+
 function geminiMcpServers() {
   return Object.fromEntries(
     Object.entries(servers).map(([name, server]) => [
@@ -143,6 +157,16 @@ async function buildClaude() {
     ...pluginMetadata(),
     skills: "./skills",
     mcpServers: absoluteMcpServers("${CLAUDE_PLUGIN_ROOT}"),
+  });
+  // Cursor imports Claude Code plugins but only loads them when a
+  // .cursor-plugin manifest exists at the plugin root, so the Claude
+  // marketplace artifact ships both manifests.
+  await writeJson(resolve(target, "mcp.json"), { mcpServers: cursorMcpServers() });
+  await writeJson(resolve(target, ".cursor-plugin", "plugin.json"), {
+    ...pluginMetadata(),
+    displayName: "Saguaro",
+    skills: "./skills",
+    mcpServers: "./mcp.json",
   });
 }
 
