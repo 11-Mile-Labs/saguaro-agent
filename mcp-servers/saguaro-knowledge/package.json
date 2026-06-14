@@ -1,6 +1,6 @@
 {
   "name": "@11-mile-labs/saguaro-knowledge",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Saguaro knowledge MCP server.",
   "type": "module",
   "main": "dist/index.mjs",

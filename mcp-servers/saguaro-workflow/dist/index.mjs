@@ -31009,10 +31009,21 @@ function requiredToolsForPhase(phase) {
   }
   return required2;
 }
+function isDocsWriterPhase(phase) {
+  return phase.agent.toLowerCase() === "docs-writer";
+}
 function dispatchContractForPhase(phase, artifactPath) {
   const instructions = [
     `Run phase "${phase.id}" and write the final artifact to ${artifactPath}.`
   ];
+  if (isDocsWriterPhase(phase)) {
+    instructions.push(
+      "Docs-writer phases must write complete multi-section markdown prose, not a pointer, summary, or path."
+    );
+    instructions.push(
+      "When recording the artifact, pass the full markdown document in artifact.content."
+    );
+  }
   if (phase.contract.requires_memory_query) {
     instructions.push("Call memory_retrieve before producing output.");
   }
@@ -39415,6 +39426,26 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // src/server.ts
+var MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS = 1024;
+var DOCS_WRITER_STUB_PATTERNS = [/See full artifact at/i, /Full docs written to/i];
+function assertCompleteDocsWriterArtifact(args) {
+  if (args.artifactStatus !== "complete" || args.phaseAgent.toLowerCase() !== "docs-writer") {
+    return;
+  }
+  for (const pattern of DOCS_WRITER_STUB_PATTERNS) {
+    if (pattern.test(args.content)) {
+      throw new Error(
+        "Complete docs-writer artifacts must contain full markdown prose, not a pointer to another artifact."
+      );
+    }
+  }
+  const nonWhitespaceChars = args.content.replace(/\s/g, "").length;
+  if (nonWhitespaceChars < MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS) {
+    throw new Error(
+      `Complete docs-writer artifacts must contain at least ${MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS} non-whitespace characters.`
+    );
+  }
+}
 var WorkflowService = class {
   projectRoot;
   bundledWorkflowsDir;
@@ -39705,7 +39736,13 @@ var WorkflowService = class {
       outputs: {},
       format: "md"
     } : args.artifact;
+    const phase = getWorkflowPhase(run.workflow, args.phase_id);
     const format = payload.format ?? (payload.content ? "md" : "json");
+    assertCompleteDocsWriterArtifact({
+      phaseAgent: phase.agent,
+      artifactStatus,
+      content: payload.content ?? ""
+    });
     const path = artifactPathForPhase(run.runDir, args.phase_id, format);
     mkdirSync4(resolve6(path, ".."), { recursive: true });
     if (format === "json") {

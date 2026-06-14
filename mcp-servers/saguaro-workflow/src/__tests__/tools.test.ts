@@ -55,6 +55,41 @@ phases:
   return root;
 }
 
+function writeDocsWorkflow(projectRoot: string): void {
+  writeFileSync(
+    resolve(projectRoot, ".saguaro", "workflows", "docs-quality.yaml"),
+    `
+name: docs-quality
+description: docs artifact quality workflow
+version: 1.0.0
+phases:
+  - id: docs
+    agent: docs-writer
+    contract:
+      inputs: []
+      outputs: [docs_summary]
+`,
+    "utf8"
+  );
+}
+
+function longDocsArtifact(): string {
+  const paragraph =
+    "This documentation artifact explains the workflow behavior, operational impact, verification evidence, and follow-up guidance in complete markdown prose. ";
+  return [
+    "# Complete Documentation",
+    "",
+    "## Summary",
+    paragraph.repeat(3),
+    "## Implementation Notes",
+    paragraph.repeat(3),
+    "## Verification",
+    paragraph.repeat(3),
+    "## Follow-Up",
+    paragraph.repeat(3),
+  ].join("\n");
+}
+
 describe("WorkflowService", () => {
   test("starts, dispatches, validates, and records a workflow phase", async () => {
     const projectRoot = setupProject();
@@ -352,5 +387,103 @@ phases:
         workflow_path: ".saguaro/generated/dynamic.yaml",
       })
     ).rejects.toThrow(/does not match workflow_path name/);
+  });
+
+  test("docs-writer dispatch requires full markdown in artifact.content", async () => {
+    const projectRoot = setupProject();
+    writeDocsWorkflow(projectRoot);
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+    });
+
+    const started = await service.workflowStart({
+      name: "docs-quality",
+      args: { ticket_slug: "docs-contract-test" },
+    });
+    const dispatch = await service.workflowDispatchPhase({
+      run_id: started.run_id,
+    });
+    const envelopes = (dispatch as { envelopes?: Array<{ dispatch_contract: string }> }).envelopes;
+
+    expect(envelopes?.[0]?.dispatch_contract).toContain("complete multi-section markdown prose");
+    expect(envelopes?.[0]?.dispatch_contract).toContain("not a pointer, summary, or path");
+    expect(envelopes?.[0]?.dispatch_contract).toContain("artifact.content");
+    expect(envelopes?.[0]?.dispatch_contract).toContain("full markdown document");
+  });
+
+  test("rejects pointer-only complete docs-writer artifacts", async () => {
+    const projectRoot = setupProject();
+    writeDocsWorkflow(projectRoot);
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+    });
+
+    const started = await service.workflowStart({
+      name: "docs-quality",
+      args: { ticket_slug: "docs-pointer-test" },
+    });
+
+    await expect(
+      service.workflowRecordArtifact({
+        run_id: started.run_id,
+        phase_id: "docs",
+        artifact: {
+          content: "See full artifact at .saguaro/runs/example/docs.md",
+          outputs: { docs_summary: "Wrote docs." },
+        },
+      })
+    ).rejects.toThrow(/full markdown prose/);
+  });
+
+  test("rejects undersized complete docs-writer artifacts", async () => {
+    const projectRoot = setupProject();
+    writeDocsWorkflow(projectRoot);
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+    });
+
+    const started = await service.workflowStart({
+      name: "docs-quality",
+      args: { ticket_slug: "docs-short-test" },
+    });
+
+    await expect(
+      service.workflowRecordArtifact({
+        run_id: started.run_id,
+        phase_id: "docs",
+        artifact: {
+          content: "# Docs\n\nToo short.",
+          outputs: { docs_summary: "Wrote docs." },
+        },
+      })
+    ).rejects.toThrow(/1024 non-whitespace characters/);
+  });
+
+  test("records complete docs-writer artifacts with full markdown prose", async () => {
+    const projectRoot = setupProject();
+    writeDocsWorkflow(projectRoot);
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir: resolve(projectRoot, "bundled-workflows"),
+    });
+
+    const started = await service.workflowStart({
+      name: "docs-quality",
+      args: { ticket_slug: "docs-full-test" },
+    });
+
+    const recorded = await service.workflowRecordArtifact({
+      run_id: started.run_id,
+      phase_id: "docs",
+      artifact: {
+        content: longDocsArtifact(),
+        outputs: { docs_summary: "Wrote complete docs." },
+      },
+    });
+
+    expect(readFileSync(recorded.written_path, "utf8")).toContain("# Complete Documentation");
   });
 });

@@ -60,6 +60,10 @@ function requiredToolsForPhase(phase: WorkflowPhase): string[] {
   return required;
 }
 
+function isDocsWriterPhase(phase: WorkflowPhase): boolean {
+  return phase.agent.toLowerCase() === "docs-writer";
+}
+
 function dispatchContractForPhase(
   phase: WorkflowPhase,
   artifactPath: string
@@ -67,6 +71,15 @@ function dispatchContractForPhase(
   const instructions: string[] = [
     `Run phase "${phase.id}" and write the final artifact to ${artifactPath}.`,
   ];
+
+  if (isDocsWriterPhase(phase)) {
+    instructions.push(
+      "Docs-writer phases must write complete multi-section markdown prose, not a pointer, summary, or path."
+    );
+    instructions.push(
+      "When recording the artifact, pass the full markdown document in artifact.content."
+    );
+  }
 
   if (phase.contract.requires_memory_query) {
     instructions.push("Call memory_retrieve before producing output.");

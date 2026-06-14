@@ -52,6 +52,34 @@ type ArtifactPayload = {
   metadata?: Record<string, unknown>;
 };
 
+const MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS = 1024;
+const DOCS_WRITER_STUB_PATTERNS = [/See full artifact at/i, /Full docs written to/i];
+
+function assertCompleteDocsWriterArtifact(args: {
+  phaseAgent: string;
+  artifactStatus: "complete" | "failed" | "partial";
+  content: string;
+}) {
+  if (args.artifactStatus !== "complete" || args.phaseAgent.toLowerCase() !== "docs-writer") {
+    return;
+  }
+
+  for (const pattern of DOCS_WRITER_STUB_PATTERNS) {
+    if (pattern.test(args.content)) {
+      throw new Error(
+        "Complete docs-writer artifacts must contain full markdown prose, not a pointer to another artifact."
+      );
+    }
+  }
+
+  const nonWhitespaceChars = args.content.replace(/\s/g, "").length;
+  if (nonWhitespaceChars < MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS) {
+    throw new Error(
+      `Complete docs-writer artifacts must contain at least ${MIN_COMPLETE_DOCS_WRITER_NON_WHITESPACE_CHARS} non-whitespace characters.`
+    );
+  }
+}
+
 export class WorkflowService {
   private readonly projectRoot?: string;
 
@@ -452,7 +480,14 @@ export class WorkflowService {
           } satisfies ArtifactPayload)
         : args.artifact;
 
+    const phase = getWorkflowPhase(run.workflow, args.phase_id);
     const format = payload.format ?? (payload.content ? "md" : "json");
+    assertCompleteDocsWriterArtifact({
+      phaseAgent: phase.agent,
+      artifactStatus,
+      content: payload.content ?? "",
+    });
+
     const path = artifactPathForPhase(run.runDir, args.phase_id, format);
     mkdirSync(resolve(path, ".."), { recursive: true });
 
