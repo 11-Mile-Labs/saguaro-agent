@@ -1,6 +1,6 @@
 name: security-audit
 description: "Security audit workflow for reconnaissance, threat modeling, and remediation guidance."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: high
@@ -52,7 +52,13 @@ phases:
     depends_on: [impact]
     agent: devils-advocate
     contract:
-      inputs: [dependency_findings, abuse_case_brief, impact_doc, severity_matrix]
+      inputs:
+        - dependency_findings
+        - abuse_case_brief
+        - impact_doc
+        - severity_matrix
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: remediation
     depends_on: [da]

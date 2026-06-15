@@ -1,6 +1,6 @@
 name: bugfix
 description: "Bugfix workflow focused on reproduction, root cause, and regression safety."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: medium
@@ -45,7 +45,13 @@ phases:
     depends_on: [fix-plan]
     agent: devils-advocate
     contract:
-      inputs: [bug_summary, root_cause_brief, fix_plan, rollback_notes]
+      inputs:
+        - bug_summary
+        - root_cause_brief
+        - fix_plan
+        - rollback_notes
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: implement
     depends_on: [da]

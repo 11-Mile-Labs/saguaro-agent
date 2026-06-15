@@ -356,6 +356,7 @@ export class WorkflowService {
     const envelopes: WorkflowDispatchEnvelope[] = phases.map((phase) => {
       const phaseIndex = run.workflow.phases.findIndex((entry) => entry.id === phase.id);
       const artifactPath = artifactPathForPhase(run.runDir, phase.id);
+      const phaseInputs = resolveInputValues(run.workflow, run.status, phase.id).values;
       return generateWorkflowEnvelope({
         runId: run.status.run_id,
         workflow: run.workflow,
@@ -365,6 +366,7 @@ export class WorkflowService {
         workflowSource: run.status.workflow_source,
         harness: this.getHarness(),
         config: loadedConfig.config,
+        phaseInputs,
       });
     });
 
@@ -401,6 +403,7 @@ export class WorkflowService {
       workflowSource: run.status.workflow_source,
       harness: this.getHarness(),
       config: loadedConfig.config,
+      phaseInputs: resolveInputValues(run.workflow, run.status, args.phase_id).values,
     });
     const errors = validateEnvelopeAgainstPhase(expected, args.envelope);
     return {

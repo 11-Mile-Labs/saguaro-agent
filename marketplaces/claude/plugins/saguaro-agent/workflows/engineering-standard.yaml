@@ -1,6 +1,6 @@
 name: engineering-standard
 description: "Default engineering workflow with composite planning and required documentation."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: medium
@@ -48,6 +48,8 @@ phases:
         - implementation_plan
         - verification_plan
         - specialist_escalations: optional
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: implement
     depends_on: [da]

@@ -1,6 +1,6 @@
 name: engineering-lite
 description: "Slim engineering workflow for simple local changes with obvious implementation paths."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: medium
@@ -31,7 +31,12 @@ phases:
     depends_on: [plan]
     agent: devils-advocate
     contract:
-      inputs: [implementation_plan, affected_areas, verification_plan]
+      inputs:
+        - implementation_plan
+        - affected_areas
+        - verification_plan
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: implement
     depends_on: [da]

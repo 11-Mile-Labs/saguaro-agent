@@ -24,6 +24,9 @@ export interface WorkflowDispatchEnvelope {
   dispatch_contract: string;
 }
 
+const GENERIC_ARCHITECTURE_CHECKS = "consistency with stated invariants and module boundaries.";
+const GENERIC_REUSE_CHECKS = "search the codebase for existing equivalents before adding new code.";
+
 export function resolveModelForHarness(
   config: SaguaroConfig,
   harness: HarnessName,
@@ -64,9 +67,56 @@ function isDocsWriterPhase(phase: WorkflowPhase): boolean {
   return phase.agent.toLowerCase() === "docs-writer";
 }
 
+function isDevilsAdvocatePhase(phase: WorkflowPhase): boolean {
+  return phase.agent.toLowerCase() === "devils-advocate";
+}
+
+function formatHostCheck(value: unknown, fallback: string): string {
+  if (Array.isArray(value)) {
+    const entries = value
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0);
+
+    if (entries.length > 0) {
+      return entries.map((entry) => `- ${entry}`).join(" ");
+    }
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  return fallback;
+}
+
+function daRubricInstructions(inputs: Record<string, unknown>): string {
+  const architectureChecks = formatHostCheck(
+    inputs.architecture_checks,
+    GENERIC_ARCHITECTURE_CHECKS
+  );
+  const reuseChecks = formatHostCheck(inputs.reuse_checks, GENERIC_REUSE_CHECKS);
+
+  return [
+    "Devil's Advocate rubric: explicitly address all 7 Engineering Questions; if a question does not apply, say why.",
+    "1. Is this the simplest solution? Could 80% of the value be achieved with 30% of the complexity?",
+    "2. Are we building for a real need or a hypothetical one?",
+    "3. What's the blast radius if this breaks?",
+    `4. Does this respect the project architecture? Host-supplied checks: ${architectureChecks}`,
+    "5. What's the rollback plan?",
+    `6. Have we checked what already exists? Host-supplied checks: ${reuseChecks}`,
+    "7. What maintenance burden does this create?",
+    "Severity scale: Critical blocks implementation; Moderate must be addressed before or during implementation; Minor is advisory.",
+    "Critical means production breakage, data loss, security vulnerability, or core architecture violation.",
+    "Escalation states: BLOCKED means missing info or operator-only decision; CRITICAL_RISK maps to the existing block gate and requires explicit approval before implementation; CONTEXT_DRIFT means the solution no longer matches the intake/root cause and must be surfaced for confirmation.",
+    "Finding zero challenges is itself a red flag; document why each question does not apply. Challenge with evidence or reasoning. Do not redesign the solution.",
+    "Only Critical severity blocks; Moderate and Minor findings are advisory.",
+  ].join(" ");
+}
+
 function dispatchContractForPhase(
   phase: WorkflowPhase,
-  artifactPath: string
+  artifactPath: string,
+  phaseInputs: Record<string, unknown> = {}
 ): string {
   const instructions: string[] = [
     `Run phase "${phase.id}" and write the final artifact to ${artifactPath}.`,
@@ -79,6 +129,10 @@ function dispatchContractForPhase(
     instructions.push(
       "When recording the artifact, pass the full markdown document in artifact.content."
     );
+  }
+
+  if (isDevilsAdvocatePhase(phase)) {
+    instructions.push(daRubricInstructions(phaseInputs));
   }
 
   if (phase.contract.requires_memory_query) {
@@ -103,6 +157,7 @@ export function generateWorkflowEnvelope(args: {
   workflowSource?: WorkflowSourceMetadata;
   harness: HarnessName;
   config: SaguaroConfig;
+  phaseInputs?: Record<string, unknown>;
 }): WorkflowDispatchEnvelope {
   const defaults = resolvePhaseDefaults(args.workflow, args.phase);
 
@@ -125,7 +180,7 @@ export function generateWorkflowEnvelope(args: {
     artifact_path: args.artifactPath,
     parallel_group_id: args.phase.parallel_group ?? null,
     depends_on: [...(args.phase.depends_on ?? [])],
-    dispatch_contract: dispatchContractForPhase(args.phase, args.artifactPath),
+    dispatch_contract: dispatchContractForPhase(args.phase, args.artifactPath, args.phaseInputs),
   };
 }
 

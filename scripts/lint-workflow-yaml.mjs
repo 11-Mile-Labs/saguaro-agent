@@ -412,12 +412,16 @@ function asStringArray(value, label, errors, filePath) {
 }
 
 function normalizeContractNames(items, label, errors, filePath) {
+  return normalizeContractFields(items, label, errors, filePath).map((entry) => entry.name);
+}
+
+function normalizeContractFields(items, label, errors, filePath) {
   if (!Array.isArray(items)) {
     errors.push(`${filePath}: ${label} must be an array`);
     return [];
   }
 
-  const names = [];
+  const fields = [];
 
   for (const item of items) {
     if (typeof item === "string") {
@@ -425,7 +429,7 @@ function normalizeContractNames(items, label, errors, filePath) {
         errors.push(`${filePath}: ${label} entries must not be empty`);
         continue;
       }
-      names.push(item);
+      fields.push({ name: item, required: true });
       continue;
     }
 
@@ -440,7 +444,7 @@ function normalizeContractNames(items, label, errors, filePath) {
         errors.push(`${filePath}: ${label} mapping entry must have a name`);
         continue;
       }
-      names.push(name);
+      fields.push({ name, required: item[name] !== "optional" });
       continue;
     }
 
@@ -449,7 +453,7 @@ function normalizeContractNames(items, label, errors, filePath) {
     );
   }
 
-  return names;
+  return fields;
 }
 
 function validateDefaults(defaults, errors, filePath) {
@@ -687,7 +691,7 @@ export function lintWorkflowDefinition(workflow, { filePath = "workflow.yaml" } 
       }
     }
 
-    const inputs = normalizeContractNames(
+    const inputFields = normalizeContractFields(
       phase.contract.inputs ?? [],
       `phase "${phase.id}" contract.inputs`,
       errors,
@@ -710,8 +714,8 @@ export function lintWorkflowDefinition(workflow, { filePath = "workflow.yaml" } 
     phaseOutputs.set(phase.id, outputNames);
 
     if (dependsOn.length === 0) {
-      for (const input of inputs) {
-        rootInputs.add(input);
+      for (const input of inputFields) {
+        rootInputs.add(input.name);
       }
     }
 
@@ -755,7 +759,7 @@ export function lintWorkflowDefinition(workflow, { filePath = "workflow.yaml" } 
       continue;
     }
 
-    const inputs = normalizeContractNames(
+    const inputs = normalizeContractFields(
       phase.contract.inputs ?? [],
       `phase "${phase.id}" contract.inputs`,
       [],
@@ -770,9 +774,9 @@ export function lintWorkflowDefinition(workflow, { filePath = "workflow.yaml" } 
     }
 
     for (const input of inputs) {
-      if (!available.has(input)) {
+      if (input.required && !available.has(input.name)) {
         errors.push(
-          `${filePath}: phase "${phase.id}" input "${input}" does not resolve from workflow args or ancestor outputs`,
+          `${filePath}: phase "${phase.id}" input "${input.name}" does not resolve from workflow args or ancestor outputs`,
         );
       }
     }

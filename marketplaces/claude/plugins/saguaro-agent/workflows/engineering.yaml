@@ -1,6 +1,6 @@
 name: engineering
 description: "Full engineering workflow from intake through docs."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: medium
@@ -47,7 +47,11 @@ phases:
     agent: devils-advocate
     model_tier: deep
     contract:
-      inputs: [architecture_doc, impact_doc]
+      inputs:
+        - architecture_doc
+        - impact_doc
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: implement
     depends_on: [da]

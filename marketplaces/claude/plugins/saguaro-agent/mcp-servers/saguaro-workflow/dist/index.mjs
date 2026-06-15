@@ -30981,6 +30981,8 @@ function readDispatchLogEntries(runDir, phaseId) {
 }
 
 // ../core/src/workflow/envelope.ts
+var GENERIC_ARCHITECTURE_CHECKS = "consistency with stated invariants and module boundaries.";
+var GENERIC_REUSE_CHECKS = "search the codebase for existing equivalents before adding new code.";
 function resolveModelForHarness(config2, harness, tier) {
   if (harness === "unknown") {
     return null;
@@ -31012,7 +31014,44 @@ function requiredToolsForPhase(phase) {
 function isDocsWriterPhase(phase) {
   return phase.agent.toLowerCase() === "docs-writer";
 }
-function dispatchContractForPhase(phase, artifactPath) {
+function isDevilsAdvocatePhase(phase) {
+  return phase.agent.toLowerCase() === "devils-advocate";
+}
+function formatHostCheck(value, fallback) {
+  if (Array.isArray(value)) {
+    const entries = value.map((entry) => String(entry).trim()).filter((entry) => entry.length > 0);
+    if (entries.length > 0) {
+      return entries.map((entry) => `- ${entry}`).join(" ");
+    }
+  }
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  return fallback;
+}
+function daRubricInstructions(inputs) {
+  const architectureChecks = formatHostCheck(
+    inputs.architecture_checks,
+    GENERIC_ARCHITECTURE_CHECKS
+  );
+  const reuseChecks = formatHostCheck(inputs.reuse_checks, GENERIC_REUSE_CHECKS);
+  return [
+    "Devil's Advocate rubric: explicitly address all 7 Engineering Questions; if a question does not apply, say why.",
+    "1. Is this the simplest solution? Could 80% of the value be achieved with 30% of the complexity?",
+    "2. Are we building for a real need or a hypothetical one?",
+    "3. What's the blast radius if this breaks?",
+    `4. Does this respect the project architecture? Host-supplied checks: ${architectureChecks}`,
+    "5. What's the rollback plan?",
+    `6. Have we checked what already exists? Host-supplied checks: ${reuseChecks}`,
+    "7. What maintenance burden does this create?",
+    "Severity scale: Critical blocks implementation; Moderate must be addressed before or during implementation; Minor is advisory.",
+    "Critical means production breakage, data loss, security vulnerability, or core architecture violation.",
+    "Escalation states: BLOCKED means missing info or operator-only decision; CRITICAL_RISK maps to the existing block gate and requires explicit approval before implementation; CONTEXT_DRIFT means the solution no longer matches the intake/root cause and must be surfaced for confirmation.",
+    "Finding zero challenges is itself a red flag; document why each question does not apply. Challenge with evidence or reasoning. Do not redesign the solution.",
+    "Only Critical severity blocks; Moderate and Minor findings are advisory."
+  ].join(" ");
+}
+function dispatchContractForPhase(phase, artifactPath, phaseInputs = {}) {
   const instructions = [
     `Run phase "${phase.id}" and write the final artifact to ${artifactPath}.`
   ];
@@ -31023,6 +31062,9 @@ function dispatchContractForPhase(phase, artifactPath) {
     instructions.push(
       "When recording the artifact, pass the full markdown document in artifact.content."
     );
+  }
+  if (isDevilsAdvocatePhase(phase)) {
+    instructions.push(daRubricInstructions(phaseInputs));
   }
   if (phase.contract.requires_memory_query) {
     instructions.push("Call memory_retrieve before producing output.");
@@ -31056,7 +31098,7 @@ function generateWorkflowEnvelope(args) {
     artifact_path: args.artifactPath,
     parallel_group_id: args.phase.parallel_group ?? null,
     depends_on: [...args.phase.depends_on ?? []],
-    dispatch_contract: dispatchContractForPhase(args.phase, args.artifactPath)
+    dispatch_contract: dispatchContractForPhase(args.phase, args.artifactPath, args.phaseInputs)
   };
 }
 function validateEnvelopeAgainstPhase(expected, observed) {
@@ -39654,6 +39696,7 @@ var WorkflowService = class {
     const envelopes = phases.map((phase) => {
       const phaseIndex = run.workflow.phases.findIndex((entry) => entry.id === phase.id);
       const artifactPath = artifactPathForPhase(run.runDir, phase.id);
+      const phaseInputs = resolveInputValues(run.workflow, run.status, phase.id).values;
       return generateWorkflowEnvelope({
         runId: run.status.run_id,
         workflow: run.workflow,
@@ -39662,7 +39705,8 @@ var WorkflowService = class {
         artifactPath,
         workflowSource: run.status.workflow_source,
         harness: this.getHarness(),
-        config: loadedConfig.config
+        config: loadedConfig.config,
+        phaseInputs
       });
     });
     run.status.current_layer = layers.findIndex((layer) => layer.includes(phases[0].id));
@@ -39690,7 +39734,8 @@ var WorkflowService = class {
       artifactPath: artifactPathForPhase(run.runDir, phase.id),
       workflowSource: run.status.workflow_source,
       harness: this.getHarness(),
-      config: loadedConfig.config
+      config: loadedConfig.config,
+      phaseInputs: resolveInputValues(run.workflow, run.status, args.phase_id).values
     });
     const errors = validateEnvelopeAgainstPhase(expected, args.envelope);
     return {

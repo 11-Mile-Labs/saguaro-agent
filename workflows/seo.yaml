@@ -1,6 +1,6 @@
 name: seo
 description: "SEO workflow for search research, technical fixes, and content changes."
-version: "1.0.0"
+version: "1.1.0"
 defaults:
   model_tier: standard
   effort: medium
@@ -48,7 +48,12 @@ phases:
     agent: devils-advocate
     model_tier: deep
     contract:
-      inputs: [search_brief, technical_findings, content_plan]
+      inputs:
+        - search_brief
+        - technical_findings
+        - content_plan
+        - architecture_checks: optional
+        - reuse_checks: optional
       outputs: [da_doc, approve]
   - id: implement
     depends_on: [da]

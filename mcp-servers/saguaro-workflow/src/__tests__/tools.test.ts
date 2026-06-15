@@ -90,6 +90,57 @@ function longDocsArtifact(): string {
   ].join("\n");
 }
 
+async function dispatchEngineeringStandardDa(
+  service: WorkflowService,
+  ticketSlug: string,
+  args: Record<string, unknown> = {}
+): Promise<string> {
+  const started = await service.workflowStart({
+    name: "engineering-standard",
+    resume: false,
+    args: {
+      ticket_slug: ticketSlug,
+      ticket_description: "Exercise the DA rubric envelope.",
+      ...args,
+    },
+  });
+
+  await service.workflowDispatchPhase({ run_id: started.run_id });
+  await service.workflowRecordArtifact({
+    run_id: started.run_id,
+    phase_id: "intake",
+    artifact: {
+      content: "# Intake",
+      outputs: {
+        intake_summary: "DA rubric smoke",
+        scope_class: "enhancement",
+        acceptance_criteria: ["DA envelope contains rubric"],
+      },
+    },
+  });
+
+  await service.workflowDispatchPhase({ run_id: started.run_id });
+  await service.workflowRecordArtifact({
+    run_id: started.run_id,
+    phase_id: "plan",
+    artifact: {
+      content: "# Plan",
+      outputs: {
+        research_findings: "DA phase needs the rubric.",
+        architecture_doc: "Dispatch envelope owns phase instructions.",
+        affected_areas: ["workflow envelope"],
+        implementation_plan: "Add shared DA rubric helper.",
+        verification_plan: "Dispatch DA and inspect contract.",
+      },
+    },
+  });
+
+  const dispatch = await service.workflowDispatchPhase({ run_id: started.run_id });
+  const envelopes = (dispatch as { envelopes?: Array<{ phase_id: string; dispatch_contract: string }> }).envelopes;
+  expect(envelopes?.[0]?.phase_id).toBe("da");
+  return envelopes?.[0]?.dispatch_contract ?? "";
+}
+
 describe("WorkflowService", () => {
   test("starts, dispatches, validates, and records a workflow phase", async () => {
     const projectRoot = setupProject();
@@ -269,6 +320,55 @@ describe("WorkflowService", () => {
         "product_spec_summary",
       ])
     );
+  });
+
+  test("devils-advocate dispatch includes rubric and generic host-check fallbacks", async () => {
+    const projectRoot = setupProject();
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir,
+      env: {
+        ...process.env,
+        CODEX_HOME: "/tmp/codex-home",
+        EMBEDDINGS_API_KEY: "test-embeddings",
+        LLM_API_KEY: "test-llm",
+      },
+    });
+
+    const contract = await dispatchEngineeringStandardDa(service, "da-rubric-fallback");
+
+    expect(contract).toContain("7 Engineering Questions");
+    expect(contract).toContain("Is this the simplest solution?");
+    expect(contract).toContain("Does this respect the project architecture?");
+    expect(contract).toContain("consistency with stated invariants and module boundaries");
+    expect(contract).toContain("Have we checked what already exists?");
+    expect(contract).toContain("search the codebase for existing equivalents before adding new code");
+    expect(contract).toContain("Severity scale: Critical blocks implementation");
+    expect(contract).toContain("CRITICAL_RISK maps to the existing block gate");
+    expect(contract).toContain("requires explicit approval before implementation");
+  });
+
+  test("devils-advocate dispatch includes host-supplied architecture and reuse checks", async () => {
+    const projectRoot = setupProject();
+    const service = new WorkflowService({
+      projectRoot,
+      bundledWorkflowsDir,
+      env: {
+        ...process.env,
+        CODEX_HOME: "/tmp/codex-home",
+        EMBEDDINGS_API_KEY: "test-embeddings",
+        LLM_API_KEY: "test-llm",
+      },
+    });
+
+    const contract = await dispatchEngineeringStandardDa(service, "da-rubric-host-inputs", {
+      architecture_checks: ["Keep workflow schema stable.", "Do not bake host paths into bundled workflows."],
+      reuse_checks: "Reuse existing approval-gate semantics.",
+    });
+
+    expect(contract).toContain("- Keep workflow schema stable.");
+    expect(contract).toContain("- Do not bake host paths into bundled workflows.");
+    expect(contract).toContain("Reuse existing approval-gate semantics.");
   });
 
   test("starts from explicit workflow_path without listing or drifting on resume", async () => {

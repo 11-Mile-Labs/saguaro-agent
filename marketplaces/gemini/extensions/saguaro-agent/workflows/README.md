@@ -13,6 +13,25 @@ These workflow files are the bundled reference library for Saguaro v1.
 
 `engineering-standard` and `engineering-deep` require a documentation phase. The artifact can be an ADR, note, changelog, runbook update, or other durable project record. Use `engineering-lite` only for the simplest changes where a durable docs artifact would be noise.
 
+## Devil's Advocate rubric
+
+Bundled `devils-advocate` phases dispatch with the shared 7 Engineering Questions rubric:
+
+1. Is this the simplest solution?
+2. Are we building for a real need or a hypothetical one?
+3. What's the blast radius?
+4. Does this respect the project architecture?
+5. What's the rollback plan?
+6. Have we checked what already exists?
+7. What maintenance burden does this create?
+
+The rubric uses Critical / Moderate / Minor severity. Only Critical findings block implementation. A Critical finding maps to the existing DA approval gate: a phase output such as `approve: true` never clears the gate by itself, and the host must explicitly approve before implementation can proceed.
+
+Hosts can provide project-specific checks through workflow args or upstream phase outputs:
+
+- `architecture_checks` fills question 4. If omitted, DA uses the generic fallback: consistency with stated invariants and module boundaries.
+- `reuse_checks` fills question 6. If omitted, DA uses the generic fallback: search the codebase for existing equivalents before adding new code.
+
 ## Ground rules
 
 - Keep one workflow per file.
