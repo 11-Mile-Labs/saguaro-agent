@@ -27,3 +27,6 @@ node_modules/
 # Codegraph
 .codegraph/
 codegraph.mdc
+
+# Randolph per-project folder: never committed in a public repository.
+.randolph/
